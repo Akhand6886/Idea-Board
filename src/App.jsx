@@ -9,6 +9,8 @@ import { Sidebar } from "./components/Sidebar";
 import { UniversalInbox } from "./components/UniversalInbox";
 import { DeepNoteWorkspace } from "./components/DeepNoteWorkspace";
 import { CommandPalette } from "./components/CommandPalette";
+import { ProjectBoard } from "./components/ProjectBoard";
+import { DailyTasks } from "./components/DailyTasks";
 
 // --- Configuration ---
 const PALETTE = [
@@ -76,6 +78,24 @@ export default function IdeaOS() {
     }));
   };
 
+  const handleDeleteIdea = (projectId, ideaId) => {
+    setData(prev => ({
+      ...prev,
+      projects: prev.projects.map(p => 
+        p.id === projectId 
+          ? { ...p, ideas: p.ideas.filter(i => i.id !== ideaId) } 
+          : p
+      )
+    }));
+  };
+
+  const setTasks = (tasksUpdater) => {
+    setData(prev => ({
+      ...prev,
+      tasks: typeof tasksUpdater === 'function' ? tasksUpdater(prev.tasks) : tasksUpdater
+    }));
+  };
+
   // --- Command Palette Logic ---
   const cmdResults = useMemo(() => {
     if (!cmdSearch) return [];
@@ -124,6 +144,20 @@ export default function IdeaOS() {
               projectsData={data.projects} 
               onCapture={handleCapture} 
               onSelectItem={setSelectedItem} 
+            />
+          )}
+
+          {view === 'board' && (
+            <ProjectBoard 
+              activeProj={data.projects.find(p => p.id === activeProjId)}
+              onDeleteIdea={handleDeleteIdea}
+            />
+          )}
+
+          {view === 'tasks' && (
+            <DailyTasks 
+              tasks={data.tasks}
+              setTasks={setTasks}
             />
           )}
         </div>
