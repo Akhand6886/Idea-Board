@@ -6,7 +6,7 @@
 : Implemented v2 with "OLED" aesthetic and improved state management.
 
 ### Phase 2: The Universal Inbox
-**: Introduced the **Universal Board**.
+: Introduced the **Universal Board**.
 : Added "Move to Project" functionality to reduce mental friction.
 : Refined the sidebar navigation and UI density.
 
@@ -15,5 +15,9 @@
 : Added the **Markdown Side-Panel** for detailed thought expansion.
 : Created persistent development log and implementation plan.
 
+### Phase 4: Component Modularization
+- **[2026-05-06]**: Split `App.jsx` into modular components (`Sidebar`, `UniversalInbox`, `ProjectBoard`, `DailyTasks`, `CommandPalette`, `DeepNoteWorkspace`).
+- **[2026-05-06]**: Refactored `App.jsx` to act as the primary state controller.
+
 ---
-**Current Goal**: Transition the single-file React component into a modular Vite project.
+**Current Goal**: Backend Integration (Node.js + SQLite).
