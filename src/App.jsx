@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from "react";
 import { 
   Plus, Bell, CheckSquare, Lightbulb, Trash2, X, 
   Check, Clock, Star, Search, Settings, ChevronRight, 
-  Hash, Zap, MoveRight, 
+  Hash, Zap, MoveRight, Inbox,
   Command, Filter
 } from "lucide-react";
 import { Sidebar } from "./components/Sidebar";
@@ -11,6 +11,7 @@ import { DeepNoteWorkspace } from "./components/DeepNoteWorkspace";
 import { CommandPalette } from "./components/CommandPalette";
 import { ProjectBoard } from "./components/ProjectBoard";
 import { DailyTasks } from "./components/DailyTasks";
+import { api } from "./api";
 
 // --- Configuration ---
 const PALETTE = [
@@ -22,35 +23,41 @@ const PALETTE = [
   { name: 'Cyan', color: '#06b6d4' },
 ];
 
-const INITIAL_DATA = {
-  projects: [
-    { id: 'p1', name: 'Personal', color: '#f59e0b', ideas: [] },
-    { id: 'p2', name: 'Work', color: '#3b82f6', ideas: [] },
-  ],
-  universal: [
-    { id: 'u1', text: 'Research VAPID keys for push notifs', details: '# Steps\n1. Generate keys\n2. Save to .env', datetime: '', projectId: 'p2' },
-  ],
-  tasks: [],
-};
+const EMPTY_DATA = { projects: [], universal: [], tasks: [] };
 
 export default function IdeaOS() {
-  const [data, setData] = useState(() => {
-    const saved = localStorage.getItem('ideaos_v3_data');
-    return saved ? JSON.parse(saved) : INITIAL_DATA;
-  });
-
+  const [data, setData] = useState(EMPTY_DATA);
+  const [loading, setLoading] = useState(true);
   const [view, setView] = useState('universal');
   const [activeProjId, setActiveProjId] = useState('p1');
   
   // Phase 3 States
-  const [selectedItem, setSelectedItem] = useState(null); // The item currently open in side-panel
+  const [selectedItem, setSelectedItem] = useState(null);
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [cmdSearch, setCmdSearch] = useState('');
   const cmdRef = useRef(null);
 
+  // --- Load all data from backend on mount ---
   useEffect(() => {
-    localStorage.setItem('ideaos_v3_data', JSON.stringify(data));
-  }, [data]);
+    api.loadAll()
+      .then(d => {
+        setData(d);
+        if (d.projects.length > 0) setActiveProjId(d.projects[0].id);
+      })
+      .catch(err => {
+        console.warn('Backend unavailable, falling back to localStorage:', err.message);
+        const saved = localStorage.getItem('ideaos_v3_data');
+        if (saved) setData(JSON.parse(saved));
+      })
+      .finally(() => setLoading(false));
+  }, []);
+
+  // --- Fallback: still save to localStorage ---
+  useEffect(() => {
+    if (!loading) {
+      localStorage.setItem('ideaos_v3_data', JSON.stringify(data));
+    }
+  }, [data, loading]);
 
   // Command Palette Shortcut
   useEffect(() => {
@@ -65,10 +72,11 @@ export default function IdeaOS() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  // --- Handlers ---
+  // --- Handlers (optimistic updates + API calls) ---
   const handleCapture = (newItem) => {
     newItem.id = 'u' + Date.now();
     setData(prev => ({ ...prev, universal: [newItem, ...prev.universal] }));
+    api.createUniversal(newItem).catch(console.error);
   };
 
   const updateItemDetails = (id, details) => {
@@ -76,6 +84,7 @@ export default function IdeaOS() {
       ...prev,
       universal: prev.universal.map(u => u.id === id ? { ...u, details } : u)
     }));
+    api.updateUniversal(id, { details }).catch(console.error);
   };
 
   const handleDeleteIdea = (projectId, ideaId) => {
@@ -87,13 +96,14 @@ export default function IdeaOS() {
           : p
       )
     }));
+    api.deleteIdea(ideaId).catch(console.error);
   };
 
   const setTasks = (tasksUpdater) => {
-    setData(prev => ({
-      ...prev,
-      tasks: typeof tasksUpdater === 'function' ? tasksUpdater(prev.tasks) : tasksUpdater
-    }));
+    setData(prev => {
+      const newTasks = typeof tasksUpdater === 'function' ? tasksUpdater(prev.tasks) : tasksUpdater;
+      return { ...prev, tasks: newTasks };
+    });
   };
 
   // --- Command Palette Logic ---
@@ -102,12 +112,10 @@ export default function IdeaOS() {
     const lower = cmdSearch.toLowerCase();
     const results = [];
     
-    // Search Universal
     data.universal.forEach(u => {
       if (u.text.toLowerCase().includes(lower)) results.push({ type: 'card', item: u, icon: <Inbox size={14}/> });
     });
     
-    // Search Projects
     data.projects.forEach(p => {
       if (p.name.toLowerCase().includes(lower)) results.push({ type: 'view', view: 'board', id: p.id, label: `Go to ${p.name}`, icon: <Hash size={14}/> });
     });
@@ -115,12 +123,16 @@ export default function IdeaOS() {
     return results.slice(0, 5);
   }, [cmdSearch, data]);
 
-  // --- Styles ---
-  const glass = {
-    background: 'rgba(255, 255, 255, 0.03)',
-    backdropFilter: 'blur(20px)',
-    border: '1px solid rgba(255, 255, 255, 0.08)',
-  };
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', height: '100vh', width: '100vw', background: '#000', color: '#fff', fontFamily: 'Inter, sans-serif', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: 32, marginBottom: 12 }}>🧠</div>
+          <div style={{ color: '#444', fontSize: 14 }}>Loading workspace...</div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ display: 'flex', height: '100vh', width: '100vw', background: '#000', color: '#fff', fontFamily: 'Inter, sans-serif', overflow: 'hidden' }}>
@@ -162,7 +174,7 @@ export default function IdeaOS() {
           )}
         </div>
 
-        {/* --- Phase 3: Detail Side-Panel --- */}
+        {/* --- Detail Side-Panel --- */}
         <DeepNoteWorkspace 
           selectedItem={selectedItem} 
           setSelectedItem={setSelectedItem} 
@@ -170,7 +182,7 @@ export default function IdeaOS() {
         />
       </main>
 
-      {/* --- Phase 3: Command Palette --- */}
+      {/* --- Command Palette --- */}
       <CommandPalette 
         showCommandPalette={showCommandPalette}
         setShowCommandPalette={setShowCommandPalette}
@@ -191,5 +203,3 @@ export default function IdeaOS() {
     </div>
   );
 }
-
-
