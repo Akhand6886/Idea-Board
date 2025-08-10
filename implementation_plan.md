@@ -20,9 +20,9 @@ IdeaOS is a premium, high-performance personal workspace designed for developers
 - [x] **Deep-Note Workspace**: Develop the slide-out markdown editor for detailed notes.
 - [x] **Command Palette**: Implement `Cmd+K` global search and navigation.
 
-## Phase 3: Backend & Deployment
-- [ ] **Express Server**: Scaffold the Node.js backend.
-- [ ] **SQLite Integration**: Setup schemas for projects, ideas, and tasks.
+## Phase 3: Backend & Deployment [IN PROGRESS]
+- [x] **Express Server**: Scaffold the Node.js backend.
+- [x] **SQLite Integration**: Setup schemas for projects, ideas, and tasks.
 - [ ] **Web-Push Notifications**: Implement the service worker and notification trigger logic.
 - [ ] **Pi Deployment**: Create deployment scripts and Nginx configuration templates.
 
