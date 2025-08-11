@@ -30,9 +30,11 @@ A minimalist, high-contrast design system optimized for dark mode and focused wo
 ## 🛠 Tech Stack
 
 - **Frontend**: React 18 + Vite
+- **Backend**: Node.js + Express
+- **Database**: SQLite via `better-sqlite3`
 - **Icons**: Lucide React
 - **Design**: Vanilla CSS (Custom OLED System)
-- **State**: Persistent `localStorage` (Phase 4 will introduce SQLite/Raspberry Pi support)
+- **Architecture**: Optimistic UI updates with graceful localStorage fallback
 
 ---
 
@@ -53,8 +55,24 @@ npm install
 
 ### 3. Running Locally
 ```bash
+# Frontend only (uses localStorage fallback)
 npm run dev
+
+# Backend API server
+npm run server
+
+# Both simultaneously (recommended)
+npm run dev:full
 ```
+
+### 4. API Endpoints
+The backend runs on `http://localhost:3001` with these endpoints:
+- `GET  /api/data` — Load all data in one request
+- `POST /api/projects` — Create a project
+- `POST /api/universal` — Capture a universal card
+- `PATCH /api/universal/:id` — Update card details
+- `POST /api/tasks` — Create a task
+- `PATCH /api/tasks/:id` — Toggle task completion
 
 ---
 
@@ -63,8 +81,8 @@ npm run dev
 - [x] Phase 1: Foundation & Project Setup
 - [x] Phase 2: Universal Inbox & Project Migration
 - [x] Phase 3: Command Palette & Deep Workspace
-- [ ] **Phase 4: Component Modularization & UI Polish**
-- [ ] **Phase 5: Backend Integration (Node.js + SQLite)**
+- [x] Phase 4: Component Modularization & UI Polish
+- [x] **Phase 5: Backend Integration (Node.js + SQLite)**
 - [ ] **Phase 6: Raspberry Pi Deployment & Push Notifications**
 
 ---
