@@ -83,7 +83,7 @@ The backend runs on `http://localhost:3001` with these endpoints:
 - [x] Phase 3: Command Palette & Deep Workspace
 - [x] Phase 4: Component Modularization & UI Polish
 - [x] **Phase 5: Backend Integration (Node.js + SQLite)**
-- [ ] **Phase 6: Raspberry Pi Deployment & Push Notifications**
+- [ ] **Phase (Left for later development after ful UI and Backend work): Raspberry Pi Deployment & Push Notifications**
 
 ---
 
