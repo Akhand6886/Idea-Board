@@ -23,9 +23,18 @@
 - **[2026-05-06]**: Created SQLite schema (`server/db.js`) with tables for `projects`, `ideas`, `universal`, and `tasks`.
 - **[2026-05-06]**: Built Express REST API (`server/index.js`) with full CRUD endpoints.
 - **[2026-05-06]**: Created API client (`src/api.js`) for clean frontend-backend communication.
-- **[2026-05-06]**: Rewrote `App.jsx` with **optimistic updates** — UI updates instantly, API syncs in background.
-- **[2026-05-06]**: Implemented **graceful degradation** — app falls back to `localStorage` when backend is unavailable.
-- **[2026-05-06]**: Verified: API returns data in exact frontend shape. Server starts cleanly on port 3001.
+- **[2026-05-06]**: Implemented optimistic updates and graceful localStorage fallback.
+
+### Phase 6: UI Overhaul — Reference Match
+- **[2026-05-06]**: Complete UI rebuild to match the target reference design.
+- **[2026-05-06]**: Rebuilt `Sidebar` with overdue badge, project idea counts, and inline project creation.
+- **[2026-05-06]**: Created `UniversalBoard` with masonry card grid, colored top borders, project/time tags, inline editing, filter chips, and "Move to Project" workflow.
+- **[2026-05-06]**: Rebuilt `ProjectBoard` with masonry layout and pinned star icons.
+- **[2026-05-06]**: Rebuilt `DailyTasks` with proper callback architecture.
+- **[2026-05-06]**: Created new `Reminders` component with date calendar boxes, overdue states, and project tags.
+- **[2026-05-06]**: Added browser notification support for both reminders and board card time alerts.
+- **[2026-05-06]**: Cleaned up old unused components (`UniversalInbox`, `DeepNoteWorkspace`, `CommandPalette`).
+- **[2026-05-06]**: Verified: Build passes, all 4 views render correctly, masonry layout works, filters functional.
 
 ---
-**Current Goal**: Raspberry Pi deployment scripts and push notification system.
+**Current Goal**: Polish and feature expansion.
