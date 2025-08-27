@@ -63,6 +63,9 @@ export default function IdeaOS() {
     const saved = localStorage.getItem('ideaos_board');
     return saved ? JSON.parse(saved) : SEED.board;
   });
+  const [theme, setTheme] = useState(() => {
+    return localStorage.getItem('ideaos_theme') || 'dark';
+  });
 
   const [view, setView] = useState('capture');
   const [activeProj, setActiveProj] = useState('p1');
@@ -77,6 +80,10 @@ export default function IdeaOS() {
   useEffect(() => { localStorage.setItem('ideaos_reminders', JSON.stringify(reminders)); }, [reminders]);
   useEffect(() => { localStorage.setItem('ideaos_tasks', JSON.stringify(tasks)); }, [tasks]);
   useEffect(() => { localStorage.setItem('ideaos_board', JSON.stringify(boardCards)); }, [boardCards]);
+  useEffect(() => { 
+    localStorage.setItem('ideaos_theme', theme);
+    document.documentElement.setAttribute('data-theme', theme);
+  }, [theme]);
 
   // Notification permission
   useEffect(() => {
@@ -102,6 +109,9 @@ export default function IdeaOS() {
     }, 30000);
     return () => clearInterval(iv);
   }, []);
+
+  // ── Theme toggle ──
+  const toggleTheme = () => setTheme(prev => prev === 'dark' ? 'light' : 'dark');
 
   // ── Board actions ──
   const onBoardCapture = (card) => setBoardCards(p => [card, ...p]);
@@ -147,7 +157,7 @@ export default function IdeaOS() {
     <div style={{
       display: 'flex', height: '100vh', width: '100vw',
       fontFamily: "'SF Pro Text', -apple-system, BlinkMacSystemFont, sans-serif",
-      background: '#0c0c0e', color: '#e2e0da', overflow: 'hidden'
+      background: 'var(--bg-app)', color: 'var(--text-main)', overflow: 'hidden'
     }}>
       {/* Sidebar */}
       <Sidebar
@@ -159,6 +169,7 @@ export default function IdeaOS() {
         newProjName={newProjName} setNewProjName={setNewProjName}
         newProjColor={newProjColor} setNewProjColor={setNewProjColor}
         onAddProject={onAddProject}
+        theme={theme} toggleTheme={toggleTheme}
       />
 
       {/* Main */}
