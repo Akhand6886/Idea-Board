@@ -7,6 +7,7 @@
   --bg-app: #0c0c0e;
   --bg-sidebar: #101012;
   --bg-card: #131315;
+  --bg-card-hover: #1a1a1d;
   --bg-input: #161618;
   --bg-input-inner: #181819;
   --text-main: #e2e0da;
@@ -15,6 +16,10 @@
   --border-main: #1c1c1f;
   --border-subtle: #181819;
   --accent: #f59e0b;
+  --accent-glow: rgba(245, 158, 11, 0.12);
+  --danger: #f87171;
+  --success: #4ade80;
+  --shadow-card: 0 1px 3px rgba(0,0,0,0.3);
 
   color-scheme: dark;
   background-color: var(--bg-app);
@@ -27,17 +32,22 @@
 }
 
 [data-theme='light'] {
-  --bg-app: #f8f9fa;
+  --bg-app: #f5f5f7;
   --bg-sidebar: #ffffff;
   --bg-card: #ffffff;
+  --bg-card-hover: #f8f9fa;
   --bg-input: #f1f3f5;
   --bg-input-inner: #e9ecef;
-  --text-main: #212529;
+  --text-main: #1a1a2e;
   --text-dim: #495057;
   --text-muted: #adb5bd;
   --border-main: #dee2e6;
   --border-subtle: #e9ecef;
-  --accent: #d9480f; /* Slightly darker amber for light mode */
+  --accent: #e8590c;
+  --accent-glow: rgba(232, 89, 12, 0.08);
+  --danger: #e03131;
+  --success: #2f9e44;
+  --shadow-card: 0 1px 4px rgba(0,0,0,0.06);
   
   color-scheme: light;
 }
@@ -48,7 +58,7 @@ body {
   min-height: 100vh;
   background-color: var(--bg-app);
   color: var(--text-main);
-  transition: background-color 0.2s ease, color 0.2s ease;
+  transition: background-color 0.25s ease, color 0.25s ease;
 }
 
 * {
@@ -56,5 +66,63 @@ body {
 }
 
 button, input, select, textarea {
-  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-main);
+  border-radius: 8px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+/* ── Focus ring for keyboard nav ── */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ── Selection ── */
+::selection {
+  background: var(--accent-glow);
+  color: var(--text-main);
+}
+
+/* ── Animations ── */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideDown {
+  from { opacity: 0; max-height: 0; }
+  to { opacity: 1; max-height: 400px; }
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+
+.animate-in {
+  animation: fadeIn 0.2s ease-out;
+}
+
+/* ── Drag & drop ── */
+.dragging {
+  opacity: 0.5;
+  cursor: grabbing !important;
+}
+
+.drag-over {
+  border-top: 2px solid var(--accent) !important;
 }
