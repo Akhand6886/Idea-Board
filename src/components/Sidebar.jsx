@@ -1,5 +1,5 @@
-import React from "react";
-import { LayoutGrid, Lightbulb, CheckSquare, Bell, Plus, Sun, Moon } from "lucide-react";
+import React, { useState } from "react";
+import { LayoutGrid, Lightbulb, CheckSquare, Bell, Plus, Sun, Moon, Search, MoreHorizontal, Edit2, Trash2, X, Check } from "lucide-react";
 
 const PALETTE = ['#f59e0b','#10b981','#3b82f6','#ec4899','#8b5cf6','#f97316','#06b6d4','#ef4444'];
 
@@ -9,11 +9,28 @@ export function Sidebar({
   showProjForm, setShowProjForm,
   newProjName, setNewProjName,
   newProjColor, setNewProjColor,
-  onAddProject,
-  theme, toggleTheme
+  onAddProject, onDeleteProject, onRenameProject,
+  theme, toggleTheme, onOpenPalette
 }) {
   const pending = reminders.filter(r => !r.done).length;
   const doneCount = tasks.filter(t => t.done).length;
+  const [contextMenu, setContextMenu] = useState(null); // project id
+  const [renaming, setRenaming] = useState(null); // { id, name }
+  const [confirmDelete, setConfirmDelete] = useState(null); // project id
+
+  const handleRenameSubmit = () => {
+    if (renaming && renaming.name.trim()) {
+      onRenameProject(renaming.id, renaming.name.trim());
+    }
+    setRenaming(null);
+    setContextMenu(null);
+  };
+
+  const handleDeleteConfirm = (id) => {
+    onDeleteProject(id);
+    setConfirmDelete(null);
+    setContextMenu(null);
+  };
 
   return (
     <div style={{ width: 210, background: 'var(--bg-sidebar)', borderRight: '1px solid var(--border-main)', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
@@ -23,12 +40,16 @@ export function Sidebar({
           <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: '-0.4px', color: 'var(--accent)' }}>IdeaOS</div>
           <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>Your dev workspace</div>
         </div>
-        <button 
-          onClick={toggleTheme}
-          style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-dim)', padding: 4, borderRadius: 4, display: 'flex', alignItems: 'center' }}
-        >
-          {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
-        </button>
+        <div style={{ display: 'flex', gap: 2 }}>
+          <button onClick={onOpenPalette} aria-label="Search (⌘K)" title="⌘K"
+            style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-dim)', padding: 4, borderRadius: 4, display: 'flex', alignItems: 'center' }}>
+            <Search size={14} />
+          </button>
+          <button onClick={toggleTheme} aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+            style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-dim)', padding: 4, borderRadius: 4, display: 'flex', alignItems: 'center' }}>
+            {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
+          </button>
+        </div>
       </div>
 
       {/* Navigation */}
@@ -56,17 +77,75 @@ export function Sidebar({
       <div style={{ padding: '10px 6px 6px', flex: 1, overflow: 'auto' }}>
         <div style={{ fontSize: 10, color: 'var(--text-muted)', letterSpacing: 1, textTransform: 'uppercase', padding: '0 10px', marginBottom: 5 }}>Projects</div>
         {projects.map(p => (
-          <button key={p.id} onClick={() => { setActiveProj(p.id); setView('board'); }} style={{
-            display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '6px 10px',
-            borderRadius: 6, border: 'none', cursor: 'pointer',
-            background: activeProj === p.id && view === 'board' ? 'var(--border-main)' : 'transparent',
-            color: activeProj === p.id && view === 'board' ? 'var(--text-main)' : 'var(--text-dim)',
-            fontSize: 12.5, textAlign: 'left', marginBottom: 1
-          }}>
-            <div style={{ width: 7, height: 7, borderRadius: '50%', background: p.color, flexShrink: 0 }} />
-            <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</span>
-            <span style={{ fontSize: 10.5, color: 'var(--text-muted)' }}>{p.ideas.length}</span>
-          </button>
+          <div key={p.id} style={{ position: 'relative' }}>
+            {renaming && renaming.id === p.id ? (
+              /* Rename inline input */
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 6px' }}>
+                <div style={{ width: 7, height: 7, borderRadius: '50%', background: p.color, flexShrink: 0 }} />
+                <input
+                  autoFocus
+                  value={renaming.name}
+                  onChange={e => setRenaming(r => ({ ...r, name: e.target.value }))}
+                  onKeyDown={e => { if (e.key === 'Enter') handleRenameSubmit(); if (e.key === 'Escape') setRenaming(null); }}
+                  onBlur={handleRenameSubmit}
+                  style={{ flex: 1, background: 'var(--bg-input)', border: '1px solid var(--accent)', borderRadius: 4, color: 'var(--text-main)', fontSize: 12, padding: '2px 6px', outline: 'none' }}
+                />
+              </div>
+            ) : (
+              <button onClick={() => { setActiveProj(p.id); setView('board'); setContextMenu(null); }} style={{
+                display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '6px 10px',
+                borderRadius: 6, border: 'none', cursor: 'pointer',
+                background: activeProj === p.id && view === 'board' ? 'var(--border-main)' : 'transparent',
+                color: activeProj === p.id && view === 'board' ? 'var(--text-main)' : 'var(--text-dim)',
+                fontSize: 12.5, textAlign: 'left', marginBottom: 1
+              }}>
+                <div style={{ width: 7, height: 7, borderRadius: '50%', background: p.color, flexShrink: 0 }} />
+                <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</span>
+                <span style={{ fontSize: 10.5, color: 'var(--text-muted)' }}>{p.ideas.length}</span>
+                <span
+                  onClick={(e) => { e.stopPropagation(); setContextMenu(contextMenu === p.id ? null : p.id); }}
+                  style={{ color: 'var(--text-muted)', display: 'flex', alignItems: 'center', padding: '0 2px', opacity: contextMenu === p.id ? 1 : 0.4 }}
+                >
+                  <MoreHorizontal size={12} />
+                </span>
+              </button>
+            )}
+
+            {/* Context menu */}
+            {contextMenu === p.id && !renaming && (
+              <div className="animate-in" style={{
+                position: 'absolute', right: 6, top: '100%', zIndex: 50,
+                background: 'var(--bg-card)', border: '1px solid var(--border-main)',
+                borderRadius: 8, padding: 4, boxShadow: 'var(--shadow-card)',
+                minWidth: 120
+              }}>
+                {confirmDelete === p.id ? (
+                  <div style={{ padding: '6px 8px', fontSize: 11 }}>
+                    <div style={{ color: 'var(--danger)', fontWeight: 500, marginBottom: 6 }}>Delete "{p.name}" and {p.ideas.length} ideas?</div>
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      <button onClick={() => handleDeleteConfirm(p.id)} style={{ flex: 1, background: '#f8717120', border: '1px solid #f8717140', color: '#f87171', borderRadius: 4, padding: '3px 8px', cursor: 'pointer', fontSize: 11, fontWeight: 500 }}>Delete</button>
+                      <button onClick={() => setConfirmDelete(null)} style={{ flex: 1, background: 'var(--bg-input)', border: '1px solid var(--border-main)', color: 'var(--text-dim)', borderRadius: 4, padding: '3px 8px', cursor: 'pointer', fontSize: 11 }}>Cancel</button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <button onClick={() => { setRenaming({ id: p.id, name: p.name }); }} style={{
+                      display: 'flex', alignItems: 'center', gap: 6, width: '100%', padding: '5px 8px',
+                      border: 'none', cursor: 'pointer', borderRadius: 4, background: 'transparent', color: 'var(--text-main)', fontSize: 11, textAlign: 'left'
+                    }}>
+                      <Edit2 size={11} /> Rename
+                    </button>
+                    <button onClick={() => setConfirmDelete(p.id)} style={{
+                      display: 'flex', alignItems: 'center', gap: 6, width: '100%', padding: '5px 8px',
+                      border: 'none', cursor: 'pointer', borderRadius: 4, background: 'transparent', color: '#f87171', fontSize: 11, textAlign: 'left'
+                    }}>
+                      <Trash2 size={11} /> Delete
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
         ))}
 
         <button onClick={() => setShowProjForm(v => !v)} style={{
@@ -78,9 +157,10 @@ export function Sidebar({
         </button>
 
         {showProjForm && (
-          <div style={{ padding: '8px 10px', background: 'var(--bg-input-inner)', borderRadius: 7, margin: '4px 0 8px' }}>
+          <div className="animate-in" style={{ padding: '8px 10px', background: 'var(--bg-input-inner)', borderRadius: 7, margin: '4px 0 8px' }}>
             <input value={newProjName} onChange={e => setNewProjName(e.target.value)} placeholder="Project name"
-              onKeyDown={e => e.key === 'Enter' && onAddProject()}
+              autoFocus
+              onKeyDown={e => { if (e.key === 'Enter') onAddProject(); if (e.key === 'Escape') setShowProjForm(false); }}
               style={{ width: '100%', background: 'transparent', border: 'none', color: 'var(--text-main)', fontSize: 12, outline: 'none', marginBottom: 8 }} />
             <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginBottom: 8 }}>
               {PALETTE.map(c => <div key={c} onClick={() => setNewProjColor(c)} style={{
@@ -93,9 +173,12 @@ export function Sidebar({
         )}
       </div>
 
-      {/* Date Footer */}
-      <div style={{ padding: '10px 14px', borderTop: '1px solid var(--border-main)', fontSize: 11, color: 'var(--text-muted)' }}>
-        {new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+      {/* Footer */}
+      <div style={{ padding: '10px 14px', borderTop: '1px solid var(--border-main)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+          {new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+        </span>
+        <kbd style={{ fontSize: 9, color: 'var(--text-muted)', background: 'var(--bg-input)', padding: '1px 5px', borderRadius: 3, border: '1px solid var(--border-main)' }}>⌘K</kbd>
       </div>
     </div>
   );
