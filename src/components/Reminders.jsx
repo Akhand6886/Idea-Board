@@ -1,11 +1,11 @@
 import React, { useState } from "react";
-import { Plus, Clock, Check, Trash2 } from "lucide-react";
-
-const inp = { background: 'var(--bg-input-inner)', border: '1px solid var(--border-main)', borderRadius: 7, padding: '7px 11px', color: 'var(--text-main)', fontSize: 13, outline: 'none' };
+import { Plus, Clock, Check, Trash2, Search, X, Bell } from "lucide-react";
+import { inp } from "../styles";
 
 export function Reminders({ reminders, projects, onAddReminder, onMarkDone, onDeleteReminder }) {
   const [showForm, setShowForm] = useState(false);
   const [newRem, setNewRem] = useState({ title: '', datetime: '', projectId: '' });
+  const [searchQuery, setSearchQuery] = useState('');
 
   const handleAdd = () => {
     if (!newRem.title || !newRem.datetime) return;
@@ -14,16 +14,33 @@ export function Reminders({ reminders, projects, onAddReminder, onMarkDone, onDe
     setShowForm(false);
   };
 
-  const pending = reminders.filter(r => !r.done).length;
+  const allPending = reminders.filter(r => !r.done);
+  const allDone = reminders.filter(r => r.done);
+
+  const pendingFiltered = allPending
+    .filter(r => !searchQuery || r.title.toLowerCase().includes(searchQuery.toLowerCase()))
+    .sort((a, b) => new Date(a.datetime) - new Date(b.datetime));
+  const doneFiltered = allDone.filter(r => !searchQuery || r.title.toLowerCase().includes(searchQuery.toLowerCase()));
+
+  const overdueCount = allPending.filter(r => new Date(r.datetime) < new Date()).length;
 
   return (
     <>
       <div style={{ padding: '16px 22px 12px', borderBottom: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center' }}>
         <div>
           <h2 style={{ margin: 0, fontSize: 14.5, fontWeight: 600, color: 'var(--text-main)' }}>Reminders</h2>
-          <div style={{ fontSize: 11.5, color: 'var(--text-dim)', marginTop: 3 }}>{pending} upcoming</div>
+          <div style={{ fontSize: 11.5, color: 'var(--text-dim)', marginTop: 3 }}>
+            {allPending.length} upcoming{overdueCount > 0 && <span style={{ color: 'var(--danger)' }}> · {overdueCount} overdue</span>}
+          </div>
         </div>
         <div style={{ flex: 1 }} />
+        {/* Search */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--bg-input)', border: '1px solid var(--border-main)', borderRadius: 7, padding: '4px 10px', minWidth: 160, marginRight: 8 }}>
+          <Search size={12} color="var(--text-muted)" />
+          <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search..."
+            style={{ background: 'transparent', border: 'none', color: 'var(--text-main)', fontSize: 12, outline: 'none', flex: 1 }} />
+          {searchQuery && <button onClick={() => setSearchQuery('')} aria-label="Clear search" style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 0, display: 'flex' }}><X size={10} /></button>}
+        </div>
         <button onClick={() => setShowForm(v => !v)} style={{
           display: 'flex', alignItems: 'center', gap: 6, background: 'var(--accent)', color: '#fff',
           border: 'none', borderRadius: 7, padding: '6px 13px', cursor: 'pointer', fontSize: 13, fontWeight: 600
@@ -33,9 +50,10 @@ export function Reminders({ reminders, projects, onAddReminder, onMarkDone, onDe
       </div>
 
       {showForm && (
-        <div style={{ padding: '12px 22px', borderBottom: '1px solid var(--border-subtle)', background: 'var(--bg-sidebar)' }}>
+        <div className="animate-in" style={{ padding: '12px 22px', borderBottom: '1px solid var(--border-subtle)', background: 'var(--bg-sidebar)' }}>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <input value={newRem.title} onChange={e => setNewRem(p => ({ ...p, title: e.target.value }))}
+              autoFocus onKeyDown={e => e.key === 'Enter' && handleAdd()}
               placeholder="Reminder title..." style={{ ...inp, flexGrow: 2, minWidth: 180 }} />
             <input type="datetime-local" value={newRem.datetime} onChange={e => setNewRem(p => ({ ...p, datetime: e.target.value }))}
               style={{ ...inp, minWidth: 155 }} />
@@ -50,15 +68,28 @@ export function Reminders({ reminders, projects, onAddReminder, onMarkDone, onDe
       )}
 
       <div style={{ flex: 1, overflow: 'auto', padding: '16px 22px' }}>
-        {reminders.filter(r => !r.done).sort((a, b) => new Date(a.datetime) - new Date(b.datetime)).map(r => {
+        {pendingFiltered.length === 0 && doneFiltered.length === 0 && (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px 20px', color: 'var(--text-muted)' }}>
+            <Bell size={36} style={{ opacity: 0.2 }} />
+            <div style={{ fontSize: 14, fontWeight: 500, marginTop: 16, color: 'var(--text-dim)' }}>
+              {searchQuery ? `No reminders matching "${searchQuery}"` : 'No reminders yet'}
+            </div>
+            <div style={{ fontSize: 12, marginTop: 4 }}>
+              {!searchQuery && 'Click "New" to set your first reminder'}
+            </div>
+          </div>
+        )}
+
+        {pendingFiltered.map(r => {
           const dt = new Date(r.datetime);
           const over = dt < new Date();
           const rproj = projects.find(p => p.id === r.projectId);
           return (
-            <div key={r.id} style={{
+            <div key={r.id} className="animate-in" style={{
               display: 'flex', alignItems: 'center', gap: 14, padding: '11px 14px',
               background: 'var(--bg-card)', border: `1px solid ${over ? '#f8717122' : 'var(--border-main)'}`,
-              borderRadius: 9, marginBottom: 9
+              borderRadius: 9, marginBottom: 9,
+              transition: 'background 0.15s ease',
             }}>
               <div style={{
                 width: 38, height: 38, borderRadius: 7,
@@ -76,18 +107,18 @@ export function Reminders({ reminders, projects, onAddReminder, onMarkDone, onDe
                   {rproj && <span style={{ color: rproj.color }}>● {rproj.name}</span>}
                 </div>
               </div>
-              <button onClick={() => onMarkDone(r.id)} style={{
+              <button onClick={() => onMarkDone(r.id)} aria-label="Mark done" style={{
                 background: '#0d1a0d', border: '1px solid #1e2e1e', color: '#4ade80',
                 borderRadius: 6, padding: '5px 11px', cursor: 'pointer', fontSize: 12
               }}>Done</button>
-              <button onClick={() => onDeleteReminder(r.id)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 2 }}><Trash2 size={13} /></button>
+              <button onClick={() => onDeleteReminder(r.id)} aria-label="Delete reminder" style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 2 }}><Trash2 size={13} /></button>
             </div>
           );
         })}
 
-        {reminders.filter(r => r.done).length > 0 && <>
+        {doneFiltered.length > 0 && <>
           <div style={{ fontSize: 10, color: 'var(--text-muted)', letterSpacing: 1, textTransform: 'uppercase', margin: '18px 0 8px' }}>Completed</div>
-          {reminders.filter(r => r.done).map(r => (
+          {doneFiltered.map(r => (
             <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 0', opacity: 0.3, borderBottom: '1px solid var(--border-subtle)' }}>
               <Check size={13} color="#4ade80" />
               <span style={{ fontSize: 13, textDecoration: 'line-through', color: 'var(--text-dim)', flex: 1 }}>{r.title}</span>
