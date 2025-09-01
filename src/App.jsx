@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Sidebar } from "./components/Sidebar";
 import { UniversalBoard } from "./components/UniversalBoard";
 import { ProjectBoard } from "./components/ProjectBoard";
 import { DailyTasks } from "./components/DailyTasks";
 import { Reminders } from "./components/Reminders";
+import { CommandPalette } from "./components/CommandPalette";
 
 const SEED = {
   projects: [
@@ -69,13 +70,14 @@ export default function IdeaOS() {
 
   const [view, setView] = useState('capture');
   const [activeProj, setActiveProj] = useState('p1');
+  const [showPalette, setShowPalette] = useState(false);
 
   // New project form
   const [showProjForm, setShowProjForm] = useState(false);
   const [newProjName, setNewProjName] = useState('');
   const [newProjColor, setNewProjColor] = useState('#10b981');
 
-  // Persist to localStorage
+  // ── Persist to localStorage ──
   useEffect(() => { localStorage.setItem('ideaos_projects', JSON.stringify(projects)); }, [projects]);
   useEffect(() => { localStorage.setItem('ideaos_reminders', JSON.stringify(reminders)); }, [reminders]);
   useEffect(() => { localStorage.setItem('ideaos_tasks', JSON.stringify(tasks)); }, [tasks]);
@@ -85,12 +87,24 @@ export default function IdeaOS() {
     document.documentElement.setAttribute('data-theme', theme);
   }, [theme]);
 
-  // Notification permission
+  // ── Global keyboard shortcut: ⌘K ──
+  useEffect(() => {
+    const handler = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setShowPalette(v => !v);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
+
+  // ── Notification permission ──
   useEffect(() => {
     if ('Notification' in window) Notification.requestPermission();
   }, []);
 
-  // Reminder notification check
+  // ── Reminder notification check ──
   useEffect(() => {
     const iv = setInterval(() => {
       const now = new Date();
@@ -110,7 +124,7 @@ export default function IdeaOS() {
     return () => clearInterval(iv);
   }, []);
 
-  // ── Theme toggle ──
+  // ── Theme ──
   const toggleTheme = () => setTheme(prev => prev === 'dark' ? 'light' : 'dark');
 
   // ── Board actions ──
@@ -132,6 +146,11 @@ export default function IdeaOS() {
   const onDeleteIdea = (projId, ideaId) => {
     setProjects(p => p.map(pr => pr.id === projId ? { ...pr, ideas: pr.ideas.filter(i => i.id !== ideaId) } : pr));
   };
+  const onTogglePin = (projId, ideaId) => {
+    setProjects(p => p.map(pr => pr.id === projId
+      ? { ...pr, ideas: pr.ideas.map(i => i.id === ideaId ? { ...i, pinned: !i.pinned } : i) }
+      : pr));
+  };
   const onAddProject = () => {
     if (!newProjName.trim()) return;
     const id = 'p' + Date.now();
@@ -139,16 +158,40 @@ export default function IdeaOS() {
     setActiveProj(id); setView('board');
     setNewProjName(''); setShowProjForm(false);
   };
+  const onDeleteProject = (id) => {
+    setProjects(p => p.filter(pr => pr.id !== id));
+    if (activeProj === id) {
+      setActiveProj(projects[0]?.id || '');
+      setView('capture');
+    }
+  };
+  const onRenameProject = (id, name) => {
+    setProjects(p => p.map(pr => pr.id === id ? { ...pr, name } : pr));
+  };
 
   // ── Task actions ──
   const onAddTask = (task) => setTasks(p => [...p, task]);
   const onToggleTask = (id) => setTasks(p => p.map(t => t.id === id ? { ...t, done: !t.done } : t));
   const onDeleteTask = (id) => setTasks(p => p.filter(t => t.id !== id));
+  const onReorderTasks = (fromIdx, toIdx) => {
+    setTasks(prev => {
+      const updated = [...prev];
+      const [moved] = updated.splice(fromIdx, 1);
+      updated.splice(toIdx, 0, moved);
+      return updated;
+    });
+  };
 
   // ── Reminder actions ──
   const onAddReminder = (rem) => setReminders(p => [...p, rem]);
   const onMarkReminderDone = (id) => setReminders(p => p.map(r => r.id === id ? { ...r, done: true } : r));
   const onDeleteReminder = (id) => setReminders(p => p.filter(r => r.id !== id));
+
+  // ── Command palette navigation ──
+  const onPaletteNavigate = useCallback((targetView, projId) => {
+    setView(targetView);
+    if (projId) setActiveProj(projId);
+  }, []);
 
   const proj = projects.find(p => p.id === activeProj);
   const boardOverdue = boardCards.filter(c => c.datetime && !c.remindFired && new Date(c.datetime) < new Date()).length;
@@ -159,6 +202,17 @@ export default function IdeaOS() {
       fontFamily: "'SF Pro Text', -apple-system, BlinkMacSystemFont, sans-serif",
       background: 'var(--bg-app)', color: 'var(--text-main)', overflow: 'hidden'
     }}>
+      {/* Command Palette */}
+      <CommandPalette
+        open={showPalette}
+        onClose={() => setShowPalette(false)}
+        projects={projects}
+        boardCards={boardCards}
+        tasks={tasks}
+        reminders={reminders}
+        onNavigate={onPaletteNavigate}
+      />
+
       {/* Sidebar */}
       <Sidebar
         view={view} setView={setView}
@@ -169,7 +223,10 @@ export default function IdeaOS() {
         newProjName={newProjName} setNewProjName={setNewProjName}
         newProjColor={newProjColor} setNewProjColor={setNewProjColor}
         onAddProject={onAddProject}
+        onDeleteProject={onDeleteProject}
+        onRenameProject={onRenameProject}
         theme={theme} toggleTheme={toggleTheme}
+        onOpenPalette={() => setShowPalette(true)}
       />
 
       {/* Main */}
@@ -183,11 +240,11 @@ export default function IdeaOS() {
         )}
 
         {view === 'board' && (
-          <ProjectBoard proj={proj} onAddIdea={onAddIdea} onDeleteIdea={onDeleteIdea} />
+          <ProjectBoard proj={proj} onAddIdea={onAddIdea} onDeleteIdea={onDeleteIdea} onTogglePin={onTogglePin} />
         )}
 
         {view === 'tasks' && (
-          <DailyTasks tasks={tasks} onAddTask={onAddTask} onToggleTask={onToggleTask} onDeleteTask={onDeleteTask} />
+          <DailyTasks tasks={tasks} onAddTask={onAddTask} onToggleTask={onToggleTask} onDeleteTask={onDeleteTask} onReorderTasks={onReorderTasks} />
         )}
 
         {view === 'reminders' && (
