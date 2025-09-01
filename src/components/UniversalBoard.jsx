@@ -1,5 +1,6 @@
 import React, { useState, useRef } from "react";
-import { ChevronDown, ChevronUp, AlarmClock, Folder, X, Send } from "lucide-react";
+import { ChevronDown, ChevronUp, AlarmClock, Folder, X, Send, Search } from "lucide-react";
+import { inp } from "../styles";
 
 function timeAgo(iso) {
   const s = Math.floor((Date.now() - new Date(iso)) / 1000);
@@ -15,15 +16,16 @@ function fmtDt(iso) {
     d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 }
 
-const inp = { background: 'var(--bg-input-inner)', border: '1px solid var(--border-main)', borderRadius: 7, padding: '7px 11px', color: 'var(--text-main)', fontSize: 13, outline: 'none' };
-
 export function UniversalBoard({ boardCards, projects, onCapture, onUpdateCard, onDeleteCard, onSendToProject }) {
   const [capText, setCapText] = useState('');
   const [capTime, setCapTime] = useState('');
   const [capProj, setCapProj] = useState('');
   const [capExpand, setCapExpand] = useState(false);
   const [filterProj, setFilterProj] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const [editCard, setEditCard] = useState(null);
+  const [editingText, setEditingText] = useState(null); // { id, text }
+  const [hoveredCard, setHoveredCard] = useState(null);
   const capInputRef = useRef(null);
 
   const handleCapture = () => {
@@ -40,18 +42,43 @@ export function UniversalBoard({ boardCards, projects, onCapture, onUpdateCard, 
     capInputRef.current?.focus();
   };
 
+  const handleTextEdit = (cardId) => {
+    if (editingText && editingText.text.trim()) {
+      onUpdateCard(cardId, { text: editingText.text.trim() });
+    }
+    setEditingText(null);
+  };
+
   const filteredCards = boardCards.filter(c => {
     if (filterProj === '__timed__') return !!c.datetime;
     if (filterProj) return c.projectId === filterProj;
     return true;
-  });
+  }).filter(c => !searchQuery || c.text.toLowerCase().includes(searchQuery.toLowerCase()));
+
+  const cardCount = filteredCards.length;
+  const totalCount = boardCards.length;
 
   return (
     <>
       {/* Header */}
-      <div style={{ padding: '16px 22px 12px', borderBottom: '1px solid var(--border-subtle)' }}>
-        <h2 style={{ margin: 0, fontSize: 14.5, fontWeight: 600, color: 'var(--text-main)' }}>Universal Board</h2>
-        <div style={{ fontSize: 11.5, color: 'var(--text-dim)', marginTop: 3 }}>Capture anything — attach a time, a project, or both</div>
+      <div style={{ padding: '16px 22px 12px', borderBottom: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div>
+          <h2 style={{ margin: 0, fontSize: 14.5, fontWeight: 600, color: 'var(--text-main)' }}>Universal Board</h2>
+          <div style={{ fontSize: 11.5, color: 'var(--text-dim)', marginTop: 3 }}>
+            {totalCount} card{totalCount !== 1 ? 's' : ''} · Capture anything
+          </div>
+        </div>
+        {/* Search */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--bg-input)', border: '1px solid var(--border-main)', borderRadius: 7, padding: '4px 10px', minWidth: 180 }}>
+          <Search size={12} color="var(--text-muted)" />
+          <input
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            placeholder="Search cards..."
+            style={{ background: 'transparent', border: 'none', color: 'var(--text-main)', fontSize: 12, outline: 'none', flex: 1 }}
+          />
+          {searchQuery && <button onClick={() => setSearchQuery('')} aria-label="Clear search" style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 0, display: 'flex' }}><X size={10} /></button>}
+        </div>
       </div>
 
       {/* Quick-capture input */}
@@ -76,12 +103,12 @@ export function UniversalBoard({ boardCards, projects, onCapture, onUpdateCard, 
 
         {/* Expanded options */}
         {capExpand && (
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', paddingTop: 2 }}>
+          <div className="animate-in" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', paddingTop: 2 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--bg-input)', border: '1px solid var(--border-main)', borderRadius: 7, padding: '5px 10px', flex: 1, minWidth: 190 }}>
               <AlarmClock size={13} color="var(--accent)" />
               <input type="datetime-local" value={capTime} onChange={e => setCapTime(e.target.value)}
                 style={{ background: 'transparent', border: 'none', color: capTime ? 'var(--text-main)' : 'var(--text-muted)', fontSize: 12, outline: 'none', flex: 1 }} />
-              {capTime && <button onClick={() => setCapTime('')} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 0, display: 'flex' }}><X size={11} /></button>}
+              {capTime && <button onClick={() => setCapTime('')} aria-label="Clear time" style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 0, display: 'flex' }}><X size={11} /></button>}
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--bg-input)', border: '1px solid var(--border-main)', borderRadius: 7, padding: '5px 10px', flex: 1, minWidth: 130 }}>
               <Folder size={13} color={capProj ? projects.find(p => p.id === capProj)?.color : 'var(--text-muted)'} />
@@ -120,25 +147,55 @@ export function UniversalBoard({ boardCards, projects, onCapture, onUpdateCard, 
       {/* Board cards */}
       <div style={{ flex: 1, overflow: 'auto', padding: '18px 20px' }}>
         {filteredCards.length === 0 ? (
-          <div style={{ color: 'var(--text-muted)', fontSize: 13, paddingTop: 16 }}>No cards yet — capture something above.</div>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px 20px', color: 'var(--text-muted)' }}>
+            <LayoutGridEmpty />
+            <div style={{ fontSize: 14, fontWeight: 500, marginTop: 16, color: 'var(--text-dim)' }}>
+              {searchQuery ? `No cards matching "${searchQuery}"` : 'No cards yet'}
+            </div>
+            <div style={{ fontSize: 12, marginTop: 4 }}>
+              {searchQuery ? 'Try a different search term' : 'Type a thought above and hit Capture'}
+            </div>
+          </div>
         ) : (
           <div style={{ columns: 3, columnGap: 14 }}>
             {filteredCards.map(card => {
               const isEditing = editCard === card.id;
+              const isEditingText = editingText && editingText.id === card.id;
               const cardProj = projects.find(p => p.id === card.projectId);
               const hasTime = !!card.datetime;
               const overdue = hasTime && new Date(card.datetime) < new Date() && !card.remindFired;
+              const isHovered = hoveredCard === card.id;
 
               return (
-                <div key={card.id} style={{
-                  display: 'block', marginBottom: 13, breakInside: 'avoid',
-                  background: 'var(--bg-card)', borderRadius: 10,
-                  border: `1px solid ${overdue ? '#f8717130' : 'var(--border-main)'}`,
-                  borderTop: `2px solid ${cardProj ? cardProj.color + '88' : overdue ? '#f87171' : 'var(--border-main)'}`,
-                  padding: '11px 13px', position: 'relative'
-                }}>
-                  {/* Main text */}
-                  <p style={{ margin: 0, fontSize: 13, lineHeight: 1.65, color: 'var(--text-main)', paddingRight: 18, wordBreak: 'break-word' }}>{card.text}</p>
+                <div key={card.id}
+                  onMouseEnter={() => setHoveredCard(card.id)}
+                  onMouseLeave={() => setHoveredCard(null)}
+                  style={{
+                    display: 'block', marginBottom: 13, breakInside: 'avoid',
+                    background: isHovered ? 'var(--bg-card-hover)' : 'var(--bg-card)',
+                    borderRadius: 10,
+                    border: `1px solid ${overdue ? '#f8717130' : 'var(--border-main)'}`,
+                    borderTop: `2px solid ${cardProj ? cardProj.color + '88' : overdue ? '#f87171' : 'var(--border-main)'}`,
+                    padding: '11px 13px', position: 'relative',
+                    boxShadow: isHovered ? 'var(--shadow-card)' : 'none',
+                    transition: 'background 0.15s ease, box-shadow 0.15s ease',
+                  }}>
+                  {/* Main text — double-click to edit */}
+                  {isEditingText ? (
+                    <textarea
+                      autoFocus
+                      value={editingText.text}
+                      onChange={e => setEditingText(t => ({ ...t, text: e.target.value }))}
+                      onBlur={() => handleTextEdit(card.id)}
+                      onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleTextEdit(card.id); } if (e.key === 'Escape') setEditingText(null); }}
+                      style={{ width: '100%', background: 'var(--bg-input)', border: '1px solid var(--accent)', borderRadius: 6, color: 'var(--text-main)', fontSize: 13, lineHeight: 1.65, padding: '6px 8px', outline: 'none', resize: 'vertical', minHeight: 40, fontFamily: 'inherit' }}
+                    />
+                  ) : (
+                    <p onDoubleClick={() => setEditingText({ id: card.id, text: card.text })}
+                      style={{ margin: 0, fontSize: 13, lineHeight: 1.65, color: 'var(--text-main)', paddingRight: 18, wordBreak: 'break-word', cursor: 'text' }}
+                      title="Double-click to edit"
+                    >{card.text}</p>
+                  )}
 
                   {/* Tags row */}
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 8, alignItems: 'center' }}>
@@ -166,12 +223,12 @@ export function UniversalBoard({ boardCards, projects, onCapture, onUpdateCard, 
 
                   {/* Inline edit panel */}
                   {isEditing && (
-                    <div style={{ marginTop: 10, borderTop: '1px solid var(--border-subtle)', paddingTop: 9, display: 'flex', flexDirection: 'column', gap: 7 }}>
+                    <div className="animate-in" style={{ marginTop: 10, borderTop: '1px solid var(--border-subtle)', paddingTop: 9, display: 'flex', flexDirection: 'column', gap: 7 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--bg-sidebar)', border: '1px solid var(--border-main)', borderRadius: 6, padding: '4px 8px' }}>
                         <AlarmClock size={11} color="var(--accent)" />
                         <input type="datetime-local" value={card.datetime} onChange={e => onUpdateCard(card.id, { datetime: e.target.value, remindFired: false })}
                           style={{ background: 'transparent', border: 'none', color: card.datetime ? 'var(--text-main)' : 'var(--text-muted)', fontSize: 11, outline: 'none', flex: 1 }} />
-                        {card.datetime && <button onClick={() => onUpdateCard(card.id, { datetime: '' })} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 0 }}><X size={10} /></button>}
+                        {card.datetime && <button onClick={() => onUpdateCard(card.id, { datetime: '' })} aria-label="Clear reminder" style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 0 }}><X size={10} /></button>}
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--bg-sidebar)', border: '1px solid var(--border-main)', borderRadius: 6, padding: '4px 8px' }}>
                         <Folder size={11} color={cardProj ? cardProj.color : 'var(--text-muted)'} />
@@ -193,14 +250,14 @@ export function UniversalBoard({ boardCards, projects, onCapture, onUpdateCard, 
                   )}
 
                   {/* Action buttons */}
-                  <div style={{ position: 'absolute', top: 7, right: 7, display: 'flex', gap: 3 }}>
-                    <button onClick={() => setEditCard(isEditing ? null : card.id)} style={{
+                  <div style={{ position: 'absolute', top: 7, right: 7, display: 'flex', gap: 3, opacity: isHovered || isEditing ? 1 : 0.3, transition: 'opacity 0.15s' }}>
+                    <button onClick={() => setEditCard(isEditing ? null : card.id)} aria-label="Edit card" style={{
                       background: isEditing ? 'var(--border-main)' : 'transparent', border: 'none',
                       color: isEditing ? 'var(--accent)' : 'var(--text-muted)', cursor: 'pointer', padding: 3, borderRadius: 4, display: 'flex', alignItems: 'center'
                     }}>
                       {isEditing ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
                     </button>
-                    <button onClick={() => onDeleteCard(card.id)} style={{
+                    <button onClick={() => onDeleteCard(card.id)} aria-label="Delete card" style={{
                       background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 3, borderRadius: 4, display: 'flex', alignItems: 'center'
                     }}>
                       <X size={11} />
@@ -213,5 +270,17 @@ export function UniversalBoard({ boardCards, projects, onCapture, onUpdateCard, 
         )}
       </div>
     </>
+  );
+}
+
+/* ── Empty state illustration ── */
+function LayoutGridEmpty() {
+  return (
+    <svg width="48" height="48" viewBox="0 0 48 48" fill="none" style={{ opacity: 0.3 }}>
+      <rect x="4" y="4" width="18" height="18" rx="4" stroke="var(--text-dim)" strokeWidth="2" strokeDasharray="4 3" />
+      <rect x="26" y="4" width="18" height="18" rx="4" stroke="var(--text-dim)" strokeWidth="2" strokeDasharray="4 3" />
+      <rect x="4" y="26" width="18" height="18" rx="4" stroke="var(--text-dim)" strokeWidth="2" strokeDasharray="4 3" />
+      <rect x="26" y="26" width="18" height="18" rx="4" stroke="var(--text-dim)" strokeWidth="2" strokeDasharray="4 3" />
+    </svg>
   );
 }
