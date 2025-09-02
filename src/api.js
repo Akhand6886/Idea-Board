@@ -15,10 +15,12 @@ export const api = {
 
   // Projects
   createProject: (project) => request('/projects', { method: 'POST', body: JSON.stringify(project) }),
+  updateProject: (id, fields) => request(`/projects/${id}`, { method: 'PATCH', body: JSON.stringify(fields) }),
   deleteProject: (id) => request(`/projects/${id}`, { method: 'DELETE' }),
 
   // Ideas
   createIdea: (projectId, idea) => request(`/projects/${projectId}/ideas`, { method: 'POST', body: JSON.stringify(idea) }),
+  updateIdea: (id, fields) => request(`/ideas/${id}`, { method: 'PATCH', body: JSON.stringify(fields) }),
   deleteIdea: (id) => request(`/ideas/${id}`, { method: 'DELETE' }),
 
   // Universal
@@ -30,4 +32,12 @@ export const api = {
   createTask: (task) => request('/tasks', { method: 'POST', body: JSON.stringify(task) }),
   toggleTask: (id, done) => request(`/tasks/${id}`, { method: 'PATCH', body: JSON.stringify({ done }) }),
   deleteTask: (id) => request(`/tasks/${id}`, { method: 'DELETE' }),
+
+  // Reminders
+  createReminder: (rem) => request('/reminders', { method: 'POST', body: JSON.stringify(rem) }),
+  updateReminder: (id, fields) => request(`/reminders/${id}`, { method: 'PATCH', body: JSON.stringify(fields) }),
+  deleteReminder: (id) => request(`/reminders/${id}`, { method: 'DELETE' }),
+
+  // Web-Push Subscribe
+  subscribe: (sub) => request('/subscribe', { method: 'POST', body: JSON.stringify(sub) }),
 };

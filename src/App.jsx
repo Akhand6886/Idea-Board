@@ -5,6 +5,7 @@ import { ProjectBoard } from "./components/ProjectBoard";
 import { DailyTasks } from "./components/DailyTasks";
 import { Reminders } from "./components/Reminders";
 import { CommandPalette } from "./components/CommandPalette";
+import { api } from "./api";
 
 const SEED = {
   projects: [
@@ -47,6 +48,21 @@ const SEED = {
   ],
 };
 
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding)
+    .replace(/\-/g, '+')
+    .replace(/_/g, '/');
+
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
+}
+
 export default function IdeaOS() {
   const [projects, setProjects] = useState(() => {
     const saved = localStorage.getItem('ideaos_projects');
@@ -77,6 +93,30 @@ export default function IdeaOS() {
   const [newProjName, setNewProjName] = useState('');
   const [newProjColor, setNewProjColor] = useState('#10b981');
 
+  // ── Load from Backend API on mount ──
+  useEffect(() => {
+    api.loadAll().then(data => {
+      if (data.projects) setProjects(data.projects);
+      if (data.reminders) setReminders(data.reminders);
+      if (data.tasks) setTasks(data.tasks);
+      if (data.universal) setBoardCards(data.universal);
+
+      // Register Service Worker & Web-Push Subscription
+      if (data.vapidPublicKey && 'serviceWorker' in navigator && 'PushManager' in window) {
+        navigator.serviceWorker.register('/sw.js').then(reg => {
+          reg.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: urlBase64ToUint8Array(data.vapidPublicKey)
+          }).then(sub => {
+            api.subscribe(sub).catch(console.warn);
+          }).catch(err => console.warn('Push subscription failed:', err));
+        }).catch(err => console.warn('SW registration failed:', err));
+      }
+    }).catch(err => {
+      console.warn('Backend API offline, using localStorage fallback:', err);
+    });
+  }, []);
+
   // ── Persist to localStorage ──
   useEffect(() => { localStorage.setItem('ideaos_projects', JSON.stringify(projects)); }, [projects]);
   useEffect(() => { localStorage.setItem('ideaos_reminders', JSON.stringify(reminders)); }, [reminders]);
@@ -104,7 +144,7 @@ export default function IdeaOS() {
     if ('Notification' in window) Notification.requestPermission();
   }, []);
 
-  // ── Reminder notification check ──
+  // ── Local Reminder notification check fallback ──
   useEffect(() => {
     const iv = setInterval(() => {
       const now = new Date();
@@ -128,35 +168,53 @@ export default function IdeaOS() {
   const toggleTheme = () => setTheme(prev => prev === 'dark' ? 'light' : 'dark');
 
   // ── Board actions ──
-  const onBoardCapture = (card) => setBoardCards(p => [card, ...p]);
-  const onBoardUpdate = (id, patch) => setBoardCards(p => p.map(c => c.id === id ? { ...c, ...patch } : c));
-  const onBoardDelete = (id) => setBoardCards(p => p.filter(c => c.id !== id));
+  const onBoardCapture = (card) => {
+    setBoardCards(p => [card, ...p]);
+    api.createUniversal(card).catch(console.warn);
+  };
+  const onBoardUpdate = (id, patch) => {
+    setBoardCards(p => p.map(c => c.id === id ? { ...c, ...patch } : c));
+    api.updateUniversal(id, patch).catch(console.warn);
+  };
+  const onBoardDelete = (id) => {
+    setBoardCards(p => p.filter(c => c.id !== id));
+    api.deleteUniversal(id).catch(console.warn);
+  };
   const onSendToProject = (card) => {
     if (!card.projectId) return;
+    const ideaId = 'i' + Date.now();
+    const newIdea = { id: ideaId, text: card.text, pinned: false };
     setProjects(p => p.map(pr => pr.id === card.projectId
-      ? { ...pr, ideas: [{ id: 'i' + Date.now(), text: card.text, pinned: false }, ...pr.ideas] }
+      ? { ...pr, ideas: [newIdea, ...pr.ideas] }
       : pr));
     onBoardDelete(card.id);
+    api.createIdea(card.projectId, newIdea).catch(console.warn);
   };
 
   // ── Project actions ──
   const onAddIdea = (projId, idea) => {
     setProjects(p => p.map(pr => pr.id === projId ? { ...pr, ideas: [idea, ...pr.ideas] } : pr));
+    api.createIdea(projId, idea).catch(console.warn);
   };
   const onDeleteIdea = (projId, ideaId) => {
     setProjects(p => p.map(pr => pr.id === projId ? { ...pr, ideas: pr.ideas.filter(i => i.id !== ideaId) } : pr));
+    api.deleteIdea(ideaId).catch(console.warn);
   };
   const onTogglePin = (projId, ideaId) => {
+    let newPinned = false;
     setProjects(p => p.map(pr => pr.id === projId
-      ? { ...pr, ideas: pr.ideas.map(i => i.id === ideaId ? { ...i, pinned: !i.pinned } : i) }
+      ? { ...pr, ideas: pr.ideas.map(i => { if (i.id === ideaId) { newPinned = !i.pinned; return { ...i, pinned: newPinned }; } return i; }) }
       : pr));
+    setTimeout(() => api.updateIdea(ideaId, { pinned: newPinned }).catch(console.warn), 0);
   };
   const onAddProject = () => {
     if (!newProjName.trim()) return;
     const id = 'p' + Date.now();
-    setProjects(p => [...p, { id, name: newProjName.trim(), color: newProjColor, ideas: [] }]);
+    const newProj = { id, name: newProjName.trim(), color: newProjColor, ideas: [] };
+    setProjects(p => [...p, newProj]);
     setActiveProj(id); setView('board');
     setNewProjName(''); setShowProjForm(false);
+    api.createProject(newProj).catch(console.warn);
   };
   const onDeleteProject = (id) => {
     setProjects(p => p.filter(pr => pr.id !== id));
@@ -164,15 +222,27 @@ export default function IdeaOS() {
       setActiveProj(projects[0]?.id || '');
       setView('capture');
     }
+    api.deleteProject(id).catch(console.warn);
   };
   const onRenameProject = (id, name) => {
     setProjects(p => p.map(pr => pr.id === id ? { ...pr, name } : pr));
+    api.updateProject(id, { name }).catch(console.warn);
   };
 
   // ── Task actions ──
-  const onAddTask = (task) => setTasks(p => [...p, task]);
-  const onToggleTask = (id) => setTasks(p => p.map(t => t.id === id ? { ...t, done: !t.done } : t));
-  const onDeleteTask = (id) => setTasks(p => p.filter(t => t.id !== id));
+  const onAddTask = (task) => {
+    setTasks(p => [...p, task]);
+    api.createTask(task).catch(console.warn);
+  };
+  const onToggleTask = (id) => {
+    let newDone = false;
+    setTasks(p => p.map(t => { if (t.id === id) { newDone = !t.done; return { ...t, done: newDone }; } return t; }));
+    setTimeout(() => api.toggleTask(id, newDone).catch(console.warn), 0);
+  };
+  const onDeleteTask = (id) => {
+    setTasks(p => p.filter(t => t.id !== id));
+    api.deleteTask(id).catch(console.warn);
+  };
   const onReorderTasks = (fromIdx, toIdx) => {
     setTasks(prev => {
       const updated = [...prev];
@@ -183,9 +253,18 @@ export default function IdeaOS() {
   };
 
   // ── Reminder actions ──
-  const onAddReminder = (rem) => setReminders(p => [...p, rem]);
-  const onMarkReminderDone = (id) => setReminders(p => p.map(r => r.id === id ? { ...r, done: true } : r));
-  const onDeleteReminder = (id) => setReminders(p => p.filter(r => r.id !== id));
+  const onAddReminder = (rem) => {
+    setReminders(p => [...p, rem]);
+    api.createReminder(rem).catch(console.warn);
+  };
+  const onMarkReminderDone = (id) => {
+    setReminders(p => p.map(r => r.id === id ? { ...r, done: true } : r));
+    api.updateReminder(id, { done: true }).catch(console.warn);
+  };
+  const onDeleteReminder = (id) => {
+    setReminders(p => p.filter(r => r.id !== id));
+    api.deleteReminder(id).catch(console.warn);
+  };
 
   // ── Command palette navigation ──
   const onPaletteNavigate = useCallback((targetView, projId) => {
