@@ -42,6 +42,7 @@ function initSchema() {
       details    TEXT NOT NULL DEFAULT '',
       datetime   TEXT NOT NULL DEFAULT '',
       project_id TEXT NOT NULL DEFAULT '',
+      remind_fired INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
@@ -50,6 +51,22 @@ function initSchema() {
       text       TEXT NOT NULL,
       done       INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS reminders (
+      id         TEXT PRIMARY KEY,
+      title      TEXT NOT NULL,
+      datetime   TEXT NOT NULL,
+      project_id TEXT NOT NULL DEFAULT '',
+      done       INTEGER NOT NULL DEFAULT 0,
+      remind_fired INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS subscriptions (
+      id            TEXT PRIMARY KEY,
+      subscription  TEXT NOT NULL,
+      created_at    TEXT NOT NULL DEFAULT (datetime('now'))
     );
   `);
 }
@@ -61,7 +78,11 @@ function seedIfEmpty() {
     insertProject.run('p1', 'Personal', '#f59e0b', 0);
     insertProject.run('p2', 'Work', '#3b82f6', 1);
 
-    const insertUniversal = db.prepare('INSERT INTO universal (id, text, details, datetime, project_id) VALUES (?, ?, ?, ?, ?)');
-    insertUniversal.run('u1', 'Research VAPID keys for push notifs', '# Steps\n1. Generate keys\n2. Save to .env', '', 'p2');
+    const insertUniversal = db.prepare('INSERT INTO universal (id, text, details, datetime, project_id, remind_fired) VALUES (?, ?, ?, ?, ?, ?)');
+    insertUniversal.run('u1', 'Research VAPID keys for push notifs', '# Steps\n1. Generate keys\n2. Save to .env', '', 'p2', 0);
+
+    const insertReminder = db.prepare('INSERT INTO reminders (id, title, datetime, project_id, done, remind_fired) VALUES (?, ?, ?, ?, ?, ?)');
+    insertReminder.run('r1', 'Review project proposal doc', new Date(Date.now() + 86400000).toISOString().slice(0, 16), 'p2', 0, 0);
+    insertReminder.run('r2', 'Call dentist to reschedule', new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 16), '', 0, 0);
   }
 }
