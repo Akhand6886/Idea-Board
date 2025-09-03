@@ -5,12 +5,12 @@ IdeaOS is a premium, high-performance personal workspace designed for developers
 ## User Review Required
 
 > [!IMPORTANT]
-> The initial version uses `localStorage` for persistence. In Phase 3, we will transition to a Node.js + SQLite backend for Raspberry Pi deployment. Please confirm if you want to start with the Backend setup immediately or polish the Frontend first.
+> The initial version used `localStorage` for persistence. In Phase 3, we transitioned to a Node.js + SQLite backend with VAPID Web-Push notifications for Raspberry Pi deployment. Please confirm if you would like to proceed with the AI agentic roadmap (Ollama/Llama 3) or advanced developer integrations (idea-cli/GitHub sync) next.
 
-## Phase 1: Project Foundation [CURRENT]
-- [ ] Initialize Vite + React project.
-- [ ] Setup folder structure (`/components`, `/hooks`, `/styles`).
-- [ ] Define Global Design System (OLED black, typography, accent colors).
+## Phase 1: Project Foundation [COMPLETED]
+- [x] Initialize Vite + React project.
+- [x] Setup folder structure (`/components`, `/hooks`, `/styles`).
+- [x] Define Global Design System (OLED black, typography, accent colors).
 
 ## Phase 2: Feature Modularization [COMPLETED]
 - [x] **Navigation & Sidebar**: Implement the core navigation logic and project list.
@@ -20,14 +20,15 @@ IdeaOS is a premium, high-performance personal workspace designed for developers
 - [x] **Deep-Note Workspace**: Develop the slide-out markdown editor for detailed notes.
 - [x] **Command Palette**: Implement `Cmd+K` global search and navigation.
 
-## Phase 3: Backend & Deployment [IN PROGRESS]
-- [x] **Express Server**: Scaffold the Node.js backend.
-- [x] **SQLite Integration**: Setup schemas for projects, ideas, and tasks.
-- [ ] **Web-Push Notifications**: Implement the service worker and notification trigger logic.
-- [ ] **Pi Deployment**: Create deployment scripts and Nginx configuration templates.
+## Phase 3: Backend & Deployment [COMPLETED]
+- [x] **Express Server**: Scaffold the Node.js backend with static file serving for production.
+- [x] **SQLite Integration**: Setup schemas for projects, ideas, tasks, reminders, and push subscriptions.
+- [x] **Web-Push Notifications**: Implement the service worker (`sw.js`), VAPID key generation, subscription storage, and background worker loop.
+- [x] **Pi Deployment**: Create multi-stage `Dockerfile`, `docker-compose.yml`, Nginx configuration templates, and `deploy.sh`.
 
 ## Verification Plan
 ### Manual Verification
 - Test `Cmd+K` navigation from every view.
 - Verify "Move to Project" correctly transfers data between states.
 - Check `localStorage` persistence across page refreshes.
+- Verify Web-Push notification subscription and background worker execution.

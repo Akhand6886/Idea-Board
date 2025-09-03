@@ -36,5 +36,14 @@
 - **[2026-05-06]**: Cleaned up old unused components (`UniversalInbox`, `DeepNoteWorkspace`, `CommandPalette`).
 - **[2026-05-06]**: Verified: Build passes, all 4 views render correctly, masonry layout works, filters functional.
 
+### Phase 7: Production Infrastructure & Web-Push (Roadmap Execution)
+- **[2026-05-17]**: Installed `web-push` and `dotenv` for VAPID push notification support.
+- **[2026-05-17]**: Updated SQLite schema (`server/db.js`) with `reminders` and `subscriptions` tables.
+- **[2026-05-17]**: Built robust VAPID key generation, `/api/subscribe` endpoint, and background push notification worker loop in `server/index.js`.
+- **[2026-05-17]**: Connected `App.jsx` to `api.js` for optimistic UI updates with graceful localStorage fallback.
+- **[2026-05-17]**: Implemented Service Worker (`public/sw.js`) for background push event handling and notification rendering.
+- **[2026-05-17]**: Created turnkey Docker and Raspberry Pi deployment suite (`Dockerfile`, `docker-compose.yml`, `nginx.conf`, `deploy.sh`).
+- **[2026-05-17]**: Verified production build (`npm run build`) passes cleanly.
+
 ---
-**Current Goal**: Polish and feature expansion.
+**Current Goal**: Evolve into AI Agentic Workflows (Ollama/Llama 3) and Advanced Developer Integrations.
