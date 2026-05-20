@@ -2,10 +2,11 @@ import React, { useState } from "react";
 import { Star, X, Search, Lightbulb } from "lucide-react";
 import { inp } from "../styles";
 
-export function ProjectBoard({ proj, onAddIdea, onDeleteIdea, onTogglePin }) {
+export function ProjectBoard({ proj, onAddIdea, onDeleteIdea, onTogglePin, onUpdateIdea }) {
   const [newIdea, setNewIdea] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
-  const [editingText, setEditingText] = useState(null); // { id, text }
+  const [editingIdeaId, setEditingIdeaId] = useState(null);
+  const [editingIdeaText, setEditingIdeaText] = useState('');
   const [hoveredCard, setHoveredCard] = useState(null);
 
   const handleAdd = () => {
@@ -14,11 +15,11 @@ export function ProjectBoard({ proj, onAddIdea, onDeleteIdea, onTogglePin }) {
     setNewIdea('');
   };
 
-  const handleTextEdit = (ideaId) => {
-    if (editingText && editingText.text.trim()) {
-      onUpdateIdeaText?.(proj.id, ideaId, editingText.text.trim());
+  const handleTextEditSubmit = (ideaId) => {
+    if (editingIdeaText.trim()) {
+      onUpdateIdea(proj.id, ideaId, { text: editingIdeaText.trim() });
     }
-    setEditingText(null);
+    setEditingIdeaId(null);
   };
 
   if (!proj) return null;
@@ -98,7 +99,33 @@ export function ProjectBoard({ proj, onAddIdea, onDeleteIdea, onTogglePin }) {
                 >
                   <Star size={10} fill={idea.pinned ? proj.color : 'none'} />
                 </button>
-                <p style={{ margin: 0, fontSize: 13, lineHeight: 1.65, color: 'var(--text-main)', paddingRight: 16 }}>{idea.text}</p>
+                {editingIdeaId === idea.id ? (
+                  <textarea
+                    autoFocus
+                    value={editingIdeaText}
+                    onChange={e => setEditingIdeaText(e.target.value)}
+                    onBlur={() => handleTextEditSubmit(idea.id)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        handleTextEditSubmit(idea.id);
+                      }
+                      if (e.key === 'Escape') setEditingIdeaId(null);
+                    }}
+                    style={{ width: '100%', background: 'var(--bg-input)', border: '1px solid var(--accent)', borderRadius: 6, color: 'var(--text-main)', fontSize: 13, lineHeight: 1.65, padding: '6px 8px', outline: 'none', resize: 'vertical', minHeight: 40, fontFamily: 'inherit' }}
+                  />
+                ) : (
+                  <p 
+                    onDoubleClick={() => {
+                      setEditingIdeaId(idea.id);
+                      setEditingIdeaText(idea.text);
+                    }}
+                    style={{ margin: 0, fontSize: 13, lineHeight: 1.65, color: 'var(--text-main)', paddingRight: 16, cursor: 'text' }}
+                    title="Double-click to edit"
+                  >
+                    {idea.text}
+                  </p>
+                )}
                 <button onClick={() => onDeleteIdea(proj.id, idea.id)} aria-label="Delete idea" style={{
                   position: 'absolute', top: 7, right: 7, background: 'transparent', border: 'none',
                   color: 'var(--text-muted)', cursor: 'pointer', padding: 2, display: 'flex',
