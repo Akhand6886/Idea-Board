@@ -30,8 +30,9 @@ export const api = {
 
   // Tasks
   createTask: (task) => request('/tasks', { method: 'POST', body: JSON.stringify(task) }),
-  toggleTask: (id, done) => request(`/tasks/${id}`, { method: 'PATCH', body: JSON.stringify({ done }) }),
+  updateTask: (id, fields) => request(`/tasks/${id}`, { method: 'PATCH', body: JSON.stringify(fields) }),
   deleteTask: (id) => request(`/tasks/${id}`, { method: 'DELETE' }),
+  reorderTasks: (ids) => request('/tasks/reorder', { method: 'PUT', body: JSON.stringify({ ids }) }),
 
   // Reminders
   createReminder: (rem) => request('/reminders', { method: 'POST', body: JSON.stringify(rem) }),
