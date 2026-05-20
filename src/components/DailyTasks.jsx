@@ -1,17 +1,28 @@
-import React, { useState, useRef } from "react";
+import React, { useState } from "react";
 import { Check, Trash2, GripVertical, Search, X, CheckSquare } from "lucide-react";
 import { inp } from "../styles";
 
-export function DailyTasks({ tasks, onAddTask, onToggleTask, onDeleteTask, onReorderTasks }) {
+export function DailyTasks({ tasks, onAddTask, onUpdateTask, onDeleteTask, onReorderTasks }) {
   const [newTask, setNewTask] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
-  const dragItem = useRef(null);
-  const dragOverItem = useRef(null);
+  const [editingTaskId, setEditingTaskId] = useState(null);
+  const [editingTaskText, setEditingTaskText] = useState('');
+
+  // Drag and drop states for live feedback
+  const [draggingIdx, setDraggingIdx] = useState(null);
+  const [dragOverIdx, setDragOverIdx] = useState(null);
 
   const handleAdd = () => {
     if (!newTask.trim()) return;
     onAddTask({ id: 't' + Date.now(), text: newTask.trim(), done: false });
     setNewTask('');
+  };
+
+  const handleTextEditSubmit = (id) => {
+    if (editingTaskText.trim()) {
+      onUpdateTask(id, { text: editingTaskText.trim() });
+    }
+    setEditingTaskId(null);
   };
 
   const doneCount = tasks.filter(t => t.done).length;
@@ -21,14 +32,17 @@ export function DailyTasks({ tasks, onAddTask, onToggleTask, onDeleteTask, onReo
   const activeTasks = tasks.filter(t => !t.done).filter(t => !searchQuery || t.text.toLowerCase().includes(searchQuery.toLowerCase()));
   const doneTasks = tasks.filter(t => t.done).filter(t => !searchQuery || t.text.toLowerCase().includes(searchQuery.toLowerCase()));
 
-  const handleDragStart = (idx) => { dragItem.current = idx; };
-  const handleDragEnter = (idx) => { dragOverItem.current = idx; };
+  const handleDragStart = (idx) => { setDraggingIdx(idx); };
+  const handleDragOver = (e, idx) => {
+    e.preventDefault();
+    setDragOverIdx(idx);
+  };
   const handleDragEnd = () => {
-    if (dragItem.current !== null && dragOverItem.current !== null && dragItem.current !== dragOverItem.current) {
-      onReorderTasks(dragItem.current, dragOverItem.current);
+    if (draggingIdx !== null && dragOverIdx !== null && draggingIdx !== dragOverIdx) {
+      onReorderTasks(draggingIdx, dragOverIdx);
     }
-    dragItem.current = null;
-    dragOverItem.current = null;
+    setDraggingIdx(null);
+    setDragOverIdx(null);
   };
 
   return (
@@ -78,36 +92,90 @@ export function DailyTasks({ tasks, onAddTask, onToggleTask, onDeleteTask, onReo
           </div>
         )}
 
-        {activeTasks.map((t, idx) => (
-          <div key={t.id}
-            draggable
-            onDragStart={() => handleDragStart(tasks.indexOf(t))}
-            onDragEnter={() => handleDragEnter(tasks.indexOf(t))}
-            onDragEnd={handleDragEnd}
-            onDragOver={e => e.preventDefault()}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0',
-              borderBottom: '1px solid var(--border-subtle)', cursor: 'grab'
-            }}>
-            <GripVertical size={12} color="var(--text-muted)" style={{ opacity: 0.4, cursor: 'grab', flexShrink: 0 }} />
-            <button onClick={() => onToggleTask(t.id)} aria-label="Complete task" style={{
-              width: 17, height: 17, borderRadius: 4, border: '1.5px solid var(--border-main)',
-              background: 'transparent', cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center'
-            }} />
-            <span style={{ fontSize: 13, color: 'var(--text-main)', flex: 1 }}>{t.text}</span>
-            <button onClick={() => onDeleteTask(t.id)} aria-label="Delete task" style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 2, opacity: 0.5 }}><Trash2 size={13} /></button>
-          </div>
-        ))}
+        {activeTasks.map((t) => {
+          const globalIdx = tasks.indexOf(t);
+          const isDragging = globalIdx === draggingIdx;
+          const isDragOver = globalIdx === dragOverIdx;
+          return (
+            <div key={t.id}
+              draggable
+              onDragStart={() => handleDragStart(globalIdx)}
+              onDragOver={(e) => handleDragOver(e, globalIdx)}
+              onDragEnd={handleDragEnd}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0',
+                borderBottom: isDragOver ? '2px solid var(--accent)' : '1px solid var(--border-subtle)',
+                opacity: isDragging ? 0.4 : 1,
+                transform: isDragging ? 'scale(0.98)' : 'none',
+                transition: 'border-bottom 0.1s ease, transform 0.1s ease, opacity 0.15s ease',
+                cursor: 'grab'
+              }}>
+              <GripVertical size={12} color="var(--text-muted)" style={{ opacity: 0.4, cursor: 'grab', flexShrink: 0 }} />
+              <button onClick={() => onUpdateTask(t.id, { done: true })} aria-label="Complete task" style={{
+                width: 17, height: 17, borderRadius: 4, border: '1.5px solid var(--border-main)',
+                background: 'transparent', cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center'
+              }} />
+              {editingTaskId === t.id ? (
+                <input
+                  autoFocus
+                  value={editingTaskText}
+                  onChange={e => setEditingTaskText(e.target.value)}
+                  onBlur={() => handleTextEditSubmit(t.id)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') handleTextEditSubmit(t.id);
+                    if (e.key === 'Escape') setEditingTaskId(null);
+                  }}
+                  style={{ flex: 1, background: 'var(--bg-input)', border: '1px solid var(--accent)', borderRadius: 4, color: 'var(--text-main)', fontSize: 13, padding: '2px 6px', outline: 'none' }}
+                />
+              ) : (
+                <span 
+                  onDoubleClick={() => {
+                    setEditingTaskId(t.id);
+                    setEditingTaskText(t.text);
+                  }}
+                  style={{ fontSize: 13, color: 'var(--text-main)', flex: 1, cursor: 'text' }}
+                  title="Double-click to edit"
+                >
+                  {t.text}
+                </span>
+              )}
+              <button onClick={() => onDeleteTask(t.id)} aria-label="Delete task" style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 2, opacity: 0.5 }}><Trash2 size={13} /></button>
+            </div>
+          );
+        })}
 
         {doneTasks.length > 0 && <>
           <div style={{ fontSize: 10, color: 'var(--text-muted)', letterSpacing: 1, textTransform: 'uppercase', padding: '18px 0 8px' }}>Completed</div>
           {doneTasks.map(t => (
-            <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', opacity: 0.38, borderBottom: '1px solid var(--border-subtle)' }}>
-              <button onClick={() => onToggleTask(t.id)} aria-label="Uncheck task" style={{
+            <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', opacity: 0.5, borderBottom: '1px solid var(--border-subtle)' }}>
+              <button onClick={() => onUpdateTask(t.id, { done: false })} aria-label="Uncheck task" style={{
                 width: 17, height: 17, borderRadius: 4, border: '1.5px solid #4ade80',
                 background: '#4ade8018', cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center'
               }}><Check size={9} color="#4ade80" /></button>
-              <span style={{ fontSize: 13, color: 'var(--text-dim)', textDecoration: 'line-through', flex: 1 }}>{t.text}</span>
+              {editingTaskId === t.id ? (
+                <input
+                  autoFocus
+                  value={editingTaskText}
+                  onChange={e => setEditingTaskText(e.target.value)}
+                  onBlur={() => handleTextEditSubmit(t.id)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') handleTextEditSubmit(t.id);
+                    if (e.key === 'Escape') setEditingTaskId(null);
+                  }}
+                  style={{ flex: 1, background: 'var(--bg-input)', border: '1px solid var(--accent)', borderRadius: 4, color: 'var(--text-main)', fontSize: 13, padding: '2px 6px', outline: 'none' }}
+                />
+              ) : (
+                <span 
+                  onDoubleClick={() => {
+                    setEditingTaskId(t.id);
+                    setEditingTaskText(t.text);
+                  }}
+                  style={{ fontSize: 13, color: 'var(--text-dim)', textDecoration: 'line-through', flex: 1, cursor: 'text' }}
+                  title="Double-click to edit"
+                >
+                  {t.text}
+                </span>
+              )}
               <button onClick={() => onDeleteTask(t.id)} aria-label="Delete task" style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 2, opacity: 0.3 }}><Trash2 size={12} /></button>
             </div>
           ))}
