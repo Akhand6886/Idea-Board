@@ -1,7 +1,10 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { Search, LayoutGrid, Lightbulb, CheckSquare, Bell, Folder, X } from "lucide-react";
 
-export function CommandPalette({ open, onClose, projects, boardCards, tasks, reminders, onNavigate }) {
+export function CommandPalette({
+  open, onClose, projects, boardCards, tasks, reminders,
+  onNavigate, onAddTask, onAddIdea, onAddReminder, activeProjId
+}) {
   const [query, setQuery] = useState('');
   const inputRef = useRef(null);
 
@@ -12,8 +15,8 @@ export function CommandPalette({ open, onClose, projects, boardCards, tasks, rem
     }
   }, [open]);
 
-  // Build searchable items
-  const items = useMemo(() => {
+  // Build navigation & database searchable items
+  const searchItems = useMemo(() => {
     const list = [
       { id: 'nav-capture', label: 'Universal Board', type: 'nav', icon: <LayoutGrid size={14} />, action: () => onNavigate('capture') },
       { id: 'nav-tasks', label: 'Daily Tasks', type: 'nav', icon: <CheckSquare size={14} />, action: () => onNavigate('tasks') },
@@ -42,9 +45,65 @@ export function CommandPalette({ open, onClose, projects, boardCards, tasks, rem
     return list;
   }, [projects, boardCards, tasks, reminders, onNavigate]);
 
-  const filtered = query.trim()
-    ? items.filter(i => i.label.toLowerCase().includes(query.toLowerCase()))
-    : items.slice(0, 8);
+  // Command items when query starts with '/'
+  const filtered = useMemo(() => {
+    if (query.startsWith('/')) {
+      const q = query.toLowerCase();
+      if (q.startsWith('/task')) {
+        const text = query.substring(5).trim();
+        return [{
+          id: 'cmd-task',
+          label: text ? `Add Task: "${text}"` : 'Type task description... (e.g. /task Buy groceries)',
+          type: 'command',
+          icon: <CheckSquare size={14} />,
+          action: () => {
+            if (!text) return;
+            onAddTask({ id: 't' + Date.now(), text, done: false });
+          }
+        }];
+      }
+      if (q.startsWith('/idea')) {
+        const text = query.substring(6).trim();
+        const activeProj = projects.find(p => p.id === activeProjId) || projects[0];
+        const projName = activeProj ? activeProj.name : 'current project';
+        return [{
+          id: 'cmd-idea',
+          label: text ? `Add Idea to ${projName}: "${text}"` : `Type idea description for ${projName}... (e.g. /idea Learn Rust)`,
+          type: 'command',
+          icon: <Lightbulb size={14} />,
+          action: () => {
+            if (!text || !activeProj) return;
+            onAddIdea(activeProj.id, { id: 'i' + Date.now(), text, pinned: false });
+          }
+        }];
+      }
+      if (q.startsWith('/rem')) {
+        const text = query.substring(5).trim();
+        return [{
+          id: 'cmd-rem',
+          label: text ? `Add Reminder (Tomorrow): "${text}"` : 'Type reminder title... (e.g. /rem Dentist appointment)',
+          type: 'command',
+          icon: <Bell size={14} />,
+          action: () => {
+            if (!text) return;
+            const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 16);
+            onAddReminder({ id: 'r' + Date.now(), title: text, datetime: tomorrow, projectId: '', done: false });
+          }
+        }];
+      }
+
+      // Default suggestions when typing '/'
+      return [
+        { id: 'suggest-task', label: 'Create a new task', type: 'suggest', icon: <CheckSquare size={14} />, action: () => setQuery('/task ') },
+        { id: 'suggest-idea', label: 'Create a new project idea', type: 'suggest', icon: <Lightbulb size={14} />, action: () => setQuery('/idea ') },
+        { id: 'suggest-rem', label: 'Create a new reminder', type: 'suggest', icon: <Bell size={14} />, action: () => setQuery('/rem ') },
+      ];
+    }
+
+    return query.trim()
+      ? searchItems.filter(i => i.label.toLowerCase().includes(query.toLowerCase()))
+      : searchItems.slice(0, 8);
+  }, [query, searchItems, projects, activeProjId, onAddTask, onAddIdea, onAddReminder]);
 
   const [selectedIdx, setSelectedIdx] = useState(0);
 
@@ -59,7 +118,16 @@ export function CommandPalette({ open, onClose, projects, boardCards, tasks, rem
 
   if (!open) return null;
 
-  const typeLabels = { nav: 'Navigate', project: 'Project', idea: 'Idea', card: 'Card', task: 'Task', reminder: 'Reminder' };
+  const typeLabels = {
+    nav: 'Navigate',
+    project: 'Project',
+    idea: 'Idea',
+    card: 'Card',
+    task: 'Task',
+    reminder: 'Reminder',
+    command: 'Run Command',
+    suggest: 'Command suggestion'
+  };
 
   return (
     <div onClick={onClose} style={{
@@ -78,7 +146,7 @@ export function CommandPalette({ open, onClose, projects, boardCards, tasks, rem
             value={query}
             onChange={e => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Search or jump to..."
+            placeholder="Search, jump to, or type '/' for commands..."
             style={{ flex: 1, background: 'transparent', border: 'none', color: 'var(--text-main)', fontSize: 14, outline: 'none' }}
           />
           <kbd style={{ fontSize: 10, color: 'var(--text-muted)', background: 'var(--bg-input)', padding: '2px 6px', borderRadius: 4, border: '1px solid var(--border-main)' }}>esc</kbd>
@@ -94,7 +162,7 @@ export function CommandPalette({ open, onClose, projects, boardCards, tasks, rem
           {filtered.map((item, idx) => (
             <button
               key={item.id}
-              onClick={() => { item.action(); onClose(); }}
+              onClick={() => { item.action(); if (item.type !== 'suggest') onClose(); }}
               onMouseEnter={() => setSelectedIdx(idx)}
               style={{
                 display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '8px 16px',
