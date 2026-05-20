@@ -10,13 +10,15 @@ export function Sidebar({
   newProjName, setNewProjName,
   newProjColor, setNewProjColor,
   onAddProject, onDeleteProject, onRenameProject,
-  theme, toggleTheme, onOpenPalette
+  theme, toggleTheme, onOpenPalette,
+  syncStatus, onMoveCardToProject
 }) {
   const pending = reminders.filter(r => !r.done).length;
   const doneCount = tasks.filter(t => t.done).length;
   const [contextMenu, setContextMenu] = useState(null); // project id
   const [renaming, setRenaming] = useState(null); // { id, name }
   const [confirmDelete, setConfirmDelete] = useState(null); // project id
+  const [dragOverProjId, setDragOverProjId] = useState(null);
 
   const handleRenameSubmit = () => {
     if (renaming && renaming.name.trim()) {
@@ -37,7 +39,18 @@ export function Sidebar({
       {/* Branding */}
       <div style={{ padding: '18px 14px 10px', borderBottom: '1px solid var(--border-main)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
-          <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: '-0.4px', color: 'var(--accent)' }}>IdeaOS</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: '-0.4px', color: 'var(--accent)' }}>IdeaOS</div>
+            <div 
+              title={syncStatus === 'synced' ? 'Synced to database' : syncStatus === 'offline' ? 'Offline (local fallback)' : 'Syncing...'} 
+              style={{
+                width: 6, height: 6, borderRadius: '50%',
+                background: syncStatus === 'synced' ? 'var(--success)' : syncStatus === 'offline' ? 'var(--danger)' : 'var(--accent)',
+                boxShadow: syncStatus === 'connecting' ? '0 0 6px var(--accent)' : 'none',
+                animation: syncStatus === 'connecting' ? 'pulse 1s infinite' : 'none',
+              }} 
+            />
+          </div>
           <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>Your dev workspace</div>
         </div>
         <div style={{ display: 'flex', gap: 2 }}>
@@ -92,13 +105,39 @@ export function Sidebar({
                 />
               </div>
             ) : (
-              <button onClick={() => { setActiveProj(p.id); setView('board'); setContextMenu(null); }} style={{
-                display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '6px 10px',
-                borderRadius: 6, border: 'none', cursor: 'pointer',
-                background: activeProj === p.id && view === 'board' ? 'var(--border-main)' : 'transparent',
-                color: activeProj === p.id && view === 'board' ? 'var(--text-main)' : 'var(--text-dim)',
-                fontSize: 12.5, textAlign: 'left', marginBottom: 1
-              }}>
+              <button 
+                onClick={() => { setActiveProj(p.id); setView('board'); setContextMenu(null); }} 
+                onDragOver={e => {
+                  e.preventDefault();
+                  setDragOverProjId(p.id);
+                }}
+                onDragLeave={() => {
+                  setDragOverProjId(null);
+                }}
+                onDrop={e => {
+                  e.preventDefault();
+                  setDragOverProjId(null);
+                  try {
+                    const data = JSON.parse(e.dataTransfer.getData("application/json"));
+                    if (data && data.cardId) {
+                      onMoveCardToProject(data.cardId, p.id);
+                    }
+                  } catch (err) {
+                    console.warn(err);
+                  }
+                }}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '6px 10px',
+                  borderRadius: 6, cursor: 'pointer',
+                  background: dragOverProjId === p.id 
+                    ? 'var(--accent-glow)' 
+                    : (activeProj === p.id && view === 'board' ? 'var(--border-main)' : 'transparent'),
+                  border: dragOverProjId === p.id ? '1px dashed var(--accent)' : 'none',
+                  color: activeProj === p.id && view === 'board' ? 'var(--text-main)' : 'var(--text-dim)',
+                  fontSize: 12.5, textAlign: 'left', marginBottom: 1,
+                  boxSizing: 'border-box'
+                }}
+              >
                 <div style={{ width: 7, height: 7, borderRadius: '50%', background: p.color, flexShrink: 0 }} />
                 <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</span>
                 <span style={{ fontSize: 10.5, color: 'var(--text-muted)' }}>{p.ideas.length}</span>
