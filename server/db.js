@@ -50,9 +50,16 @@ function initSchema() {
       id         TEXT PRIMARY KEY,
       text       TEXT NOT NULL,
       done       INTEGER NOT NULL DEFAULT 0,
+      sort_order INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
-
+  `);
+  try {
+    db.exec("ALTER TABLE tasks ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0");
+  } catch (e) {
+    // Column already exists
+  }
+  db.exec(`
     CREATE TABLE IF NOT EXISTS reminders (
       id         TEXT PRIMARY KEY,
       title      TEXT NOT NULL,
