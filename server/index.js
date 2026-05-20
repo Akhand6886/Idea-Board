@@ -48,7 +48,7 @@ app.get('/api/data', (_req, res) => {
   const projects = db.prepare('SELECT * FROM projects ORDER BY sort_order').all();
   const ideas    = db.prepare('SELECT * FROM ideas ORDER BY created_at DESC').all();
   const universal = db.prepare('SELECT * FROM universal ORDER BY created_at DESC').all();
-  const tasks    = db.prepare('SELECT * FROM tasks ORDER BY created_at DESC').all();
+  const tasks    = db.prepare('SELECT * FROM tasks ORDER BY sort_order ASC, created_at DESC').all();
   const reminders = db.prepare('SELECT * FROM reminders ORDER BY created_at DESC').all();
 
   // Nest ideas inside their projects
@@ -128,8 +128,14 @@ app.post('/api/projects/:projectId/ideas', (req, res) => {
 
 app.patch('/api/ideas/:id', (req, res) => {
   const db = getDb();
-  const { pinned } = req.body;
-  db.prepare('UPDATE ideas SET pinned = ? WHERE id = ?').run(pinned ? 1 : 0, req.params.id);
+  const { pinned, text } = req.body;
+  const fields = [];
+  const values = [];
+  if (pinned !== undefined) { fields.push('pinned = ?'); values.push(pinned ? 1 : 0); }
+  if (text !== undefined) { fields.push('text = ?'); values.push(text); }
+  if (fields.length === 0) return res.json({ ok: true });
+  values.push(req.params.id);
+  db.prepare(`UPDATE ideas SET ${fields.join(', ')} WHERE id = ?`).run(...values);
   res.json({ ok: true });
 });
 
@@ -179,8 +185,15 @@ app.post('/api/tasks', (req, res) => {
 
 app.patch('/api/tasks/:id', (req, res) => {
   const db = getDb();
-  const { done } = req.body;
-  db.prepare('UPDATE tasks SET done = ? WHERE id = ?').run(done ? 1 : 0, req.params.id);
+  const { done, text, sort_order } = req.body;
+  const fields = [];
+  const values = [];
+  if (done !== undefined) { fields.push('done = ?'); values.push(done ? 1 : 0); }
+  if (text !== undefined) { fields.push('text = ?'); values.push(text); }
+  if (sort_order !== undefined) { fields.push('sort_order = ?'); values.push(sort_order); }
+  if (fields.length === 0) return res.json({ ok: true });
+  values.push(req.params.id);
+  db.prepare(`UPDATE tasks SET ${fields.join(', ')} WHERE id = ?`).run(...values);
   res.json({ ok: true });
 });
 
@@ -200,11 +213,14 @@ app.post('/api/reminders', (req, res) => {
 
 app.patch('/api/reminders/:id', (req, res) => {
   const db = getDb();
-  const { done, remindFired } = req.body;
+  const { done, remindFired, title, datetime, projectId } = req.body;
   const fields = [];
   const values = [];
   if (done !== undefined) { fields.push('done = ?'); values.push(done ? 1 : 0); }
   if (remindFired !== undefined) { fields.push('remind_fired = ?'); values.push(remindFired ? 1 : 0); }
+  if (title !== undefined) { fields.push('title = ?'); values.push(title); }
+  if (datetime !== undefined) { fields.push('datetime = ?'); values.push(datetime); }
+  if (projectId !== undefined) { fields.push('project_id = ?'); values.push(projectId); }
   if (fields.length === 0) return res.json({ ok: true });
   values.push(req.params.id);
   db.prepare(`UPDATE reminders SET ${fields.join(', ')} WHERE id = ?`).run(...values);
@@ -214,6 +230,21 @@ app.patch('/api/reminders/:id', (req, res) => {
 app.delete('/api/reminders/:id', (req, res) => {
   const db = getDb();
   db.prepare('DELETE FROM reminders WHERE id = ?').run(req.params.id);
+  res.json({ ok: true });
+});
+
+// ─── Task Reordering ─────────────────────────────────────
+app.put('/api/tasks/reorder', (req, res) => {
+  const db = getDb();
+  const { ids } = req.body;
+  if (!Array.isArray(ids)) return res.status(400).json({ error: 'ids array required' });
+  const updateStmt = db.prepare('UPDATE tasks SET sort_order = ? WHERE id = ?');
+  const transaction = db.transaction((idList) => {
+    idList.forEach((id, idx) => {
+      updateStmt.run(idx, id);
+    });
+  });
+  transaction(ids);
   res.json({ ok: true });
 });
 
