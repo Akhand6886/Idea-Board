@@ -2,16 +2,25 @@ import React, { useState } from "react";
 import { Plus, Clock, Check, Trash2, Search, X, Bell } from "lucide-react";
 import { inp } from "../styles";
 
-export function Reminders({ reminders, projects, onAddReminder, onMarkDone, onDeleteReminder }) {
+export function Reminders({ reminders, projects, onAddReminder, onUpdateReminder, onDeleteReminder }) {
   const [showForm, setShowForm] = useState(false);
   const [newRem, setNewRem] = useState({ title: '', datetime: '', projectId: '' });
   const [searchQuery, setSearchQuery] = useState('');
+  const [editingReminderId, setEditingReminderId] = useState(null);
+  const [editingReminderTitle, setEditingReminderTitle] = useState('');
 
   const handleAdd = () => {
     if (!newRem.title || !newRem.datetime) return;
     onAddReminder({ ...newRem, id: 'r' + Date.now(), done: false });
     setNewRem({ title: '', datetime: '', projectId: '' });
     setShowForm(false);
+  };
+
+  const handleTextEditSubmit = (id) => {
+    if (editingReminderTitle.trim()) {
+      onUpdateReminder(id, { title: editingReminderTitle.trim() });
+    }
+    setEditingReminderId(null);
   };
 
   const allPending = reminders.filter(r => !r.done);
@@ -100,14 +109,37 @@ export function Reminders({ reminders, projects, onAddReminder, onMarkDone, onDe
                 <div style={{ fontSize: 9, color: over ? '#f87171' : 'var(--text-muted)', textTransform: 'uppercase' }}>{dt.toLocaleString('en', { month: 'short' })}</div>
               </div>
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-main)' }}>{r.title}</div>
+                {editingReminderId === r.id ? (
+                  <input
+                    autoFocus
+                    value={editingReminderTitle}
+                    onChange={e => setEditingReminderTitle(e.target.value)}
+                    onBlur={() => handleTextEditSubmit(r.id)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') handleTextEditSubmit(r.id);
+                      if (e.key === 'Escape') setEditingReminderId(null);
+                    }}
+                    style={{ flex: 1, width: '100%', background: 'var(--bg-input)', border: '1px solid var(--accent)', borderRadius: 4, color: 'var(--text-main)', fontSize: 13, padding: '2px 6px', outline: 'none' }}
+                  />
+                ) : (
+                  <div 
+                    onDoubleClick={() => {
+                      setEditingReminderId(r.id);
+                      setEditingReminderTitle(r.title);
+                    }}
+                    style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-main)', cursor: 'text' }}
+                    title="Double-click to edit"
+                  >
+                    {r.title}
+                  </div>
+                )}
                 <div style={{ fontSize: 11, color: over ? '#f87171' : 'var(--text-dim)', marginTop: 3, display: 'flex', alignItems: 'center', gap: 8 }}>
                   <Clock size={10} />{dt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
                   {over && <span style={{ color: '#f87171' }}>· Overdue</span>}
                   {rproj && <span style={{ color: rproj.color }}>● {rproj.name}</span>}
                 </div>
               </div>
-              <button onClick={() => onMarkDone(r.id)} aria-label="Mark done" style={{
+              <button onClick={() => onUpdateReminder(r.id, { done: true })} aria-label="Mark done" style={{
                 background: '#0d1a0d', border: '1px solid #1e2e1e', color: '#4ade80',
                 borderRadius: 6, padding: '5px 11px', cursor: 'pointer', fontSize: 12
               }}>Done</button>
@@ -121,8 +153,31 @@ export function Reminders({ reminders, projects, onAddReminder, onMarkDone, onDe
           {doneFiltered.map(r => (
             <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 0', opacity: 0.3, borderBottom: '1px solid var(--border-subtle)' }}>
               <Check size={13} color="#4ade80" />
-              <span style={{ fontSize: 13, textDecoration: 'line-through', color: 'var(--text-dim)', flex: 1 }}>{r.title}</span>
-              <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{new Date(r.datetime).toLocaleDateString()}</span>
+              {editingReminderId === r.id ? (
+                <input
+                  autoFocus
+                  value={editingReminderTitle}
+                  onChange={e => setEditingReminderTitle(e.target.value)}
+                  onBlur={() => handleTextEditSubmit(r.id)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') handleTextEditSubmit(r.id);
+                    if (e.key === 'Escape') setEditingReminderId(null);
+                  }}
+                  style={{ flex: 1, background: 'var(--bg-input)', border: '1px solid var(--accent)', borderRadius: 4, color: 'var(--text-main)', fontSize: 13, padding: '2px 6px', outline: 'none' }}
+                />
+              ) : (
+                <span 
+                  onDoubleClick={() => {
+                    setEditingReminderId(r.id);
+                    setEditingReminderTitle(r.title);
+                  }}
+                  style={{ fontSize: 13, textDecoration: 'line-through', color: 'var(--text-dim)', flex: 1, cursor: 'text' }}
+                  title="Double-click to edit"
+                >
+                  {r.title}
+                </span>
+              )}
+              <button onClick={() => onDeleteReminder(r.id)} aria-label="Delete reminder" style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 2 }}><Trash2 size={13} /></button>
             </div>
           ))}
         </>}
