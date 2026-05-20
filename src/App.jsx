@@ -93,9 +93,24 @@ export default function IdeaOS() {
   const [newProjName, setNewProjName] = useState('');
   const [newProjColor, setNewProjColor] = useState('#10b981');
 
+  const [syncStatus, setSyncStatus] = useState('connecting'); // 'connecting' | 'synced' | 'offline'
+
+  const runSync = useCallback((promise) => {
+    return promise
+      .then(res => {
+        setSyncStatus('synced');
+        return res;
+      })
+      .catch(err => {
+        console.warn(err);
+        setSyncStatus('offline');
+        throw err;
+      });
+  }, []);
+
   // ── Load from Backend API on mount ──
   useEffect(() => {
-    api.loadAll().then(data => {
+    runSync(api.loadAll()).then(data => {
       if (data.projects) setProjects(data.projects);
       if (data.reminders) setReminders(data.reminders);
       if (data.tasks) setTasks(data.tasks);
@@ -108,14 +123,15 @@ export default function IdeaOS() {
             userVisibleOnly: true,
             applicationServerKey: urlBase64ToUint8Array(data.vapidPublicKey)
           }).then(sub => {
-            api.subscribe(sub).catch(console.warn);
+            runSync(api.subscribe(sub)).catch(console.warn);
           }).catch(err => console.warn('Push subscription failed:', err));
         }).catch(err => console.warn('SW registration failed:', err));
       }
     }).catch(err => {
       console.warn('Backend API offline, using localStorage fallback:', err);
+      setSyncStatus('offline');
     });
-  }, []);
+  }, [runSync]);
 
   // ── Persist to localStorage ──
   useEffect(() => { localStorage.setItem('ideaos_projects', JSON.stringify(projects)); }, [projects]);
@@ -170,15 +186,15 @@ export default function IdeaOS() {
   // ── Board actions ──
   const onBoardCapture = (card) => {
     setBoardCards(p => [card, ...p]);
-    api.createUniversal(card).catch(console.warn);
+    runSync(api.createUniversal(card)).catch(console.warn);
   };
   const onBoardUpdate = (id, patch) => {
     setBoardCards(p => p.map(c => c.id === id ? { ...c, ...patch } : c));
-    api.updateUniversal(id, patch).catch(console.warn);
+    runSync(api.updateUniversal(id, patch)).catch(console.warn);
   };
   const onBoardDelete = (id) => {
     setBoardCards(p => p.filter(c => c.id !== id));
-    api.deleteUniversal(id).catch(console.warn);
+    runSync(api.deleteUniversal(id)).catch(console.warn);
   };
   const onSendToProject = (card) => {
     if (!card.projectId) return;
@@ -188,24 +204,41 @@ export default function IdeaOS() {
       ? { ...pr, ideas: [newIdea, ...pr.ideas] }
       : pr));
     onBoardDelete(card.id);
-    api.createIdea(card.projectId, newIdea).catch(console.warn);
+    runSync(api.createIdea(card.projectId, newIdea)).catch(console.warn);
+  };
+  const onMoveCardToProject = (cardId, projectId) => {
+    const card = boardCards.find(c => c.id === cardId);
+    if (!card) return;
+    const ideaId = 'i' + Date.now();
+    const newIdea = { id: ideaId, text: card.text, pinned: false };
+    setProjects(p => p.map(pr => pr.id === projectId
+      ? { ...pr, ideas: [newIdea, ...pr.ideas] }
+      : pr));
+    onBoardDelete(cardId);
+    runSync(api.createIdea(projectId, newIdea)).catch(console.warn);
   };
 
   // ── Project actions ──
   const onAddIdea = (projId, idea) => {
     setProjects(p => p.map(pr => pr.id === projId ? { ...pr, ideas: [idea, ...pr.ideas] } : pr));
-    api.createIdea(projId, idea).catch(console.warn);
+    runSync(api.createIdea(projId, idea)).catch(console.warn);
   };
   const onDeleteIdea = (projId, ideaId) => {
     setProjects(p => p.map(pr => pr.id === projId ? { ...pr, ideas: pr.ideas.filter(i => i.id !== ideaId) } : pr));
-    api.deleteIdea(ideaId).catch(console.warn);
+    runSync(api.deleteIdea(ideaId)).catch(console.warn);
   };
   const onTogglePin = (projId, ideaId) => {
     let newPinned = false;
     setProjects(p => p.map(pr => pr.id === projId
       ? { ...pr, ideas: pr.ideas.map(i => { if (i.id === ideaId) { newPinned = !i.pinned; return { ...i, pinned: newPinned }; } return i; }) }
       : pr));
-    setTimeout(() => api.updateIdea(ideaId, { pinned: newPinned }).catch(console.warn), 0);
+    setTimeout(() => runSync(api.updateIdea(ideaId, { pinned: newPinned })).catch(console.warn), 0);
+  };
+  const onUpdateIdea = (projId, ideaId, fields) => {
+    setProjects(p => p.map(pr => pr.id === projId
+      ? { ...pr, ideas: pr.ideas.map(i => i.id === ideaId ? { ...i, ...fields } : i) }
+      : pr));
+    runSync(api.updateIdea(ideaId, fields)).catch(console.warn);
   };
   const onAddProject = () => {
     if (!newProjName.trim()) return;
@@ -214,7 +247,7 @@ export default function IdeaOS() {
     setProjects(p => [...p, newProj]);
     setActiveProj(id); setView('board');
     setNewProjName(''); setShowProjForm(false);
-    api.createProject(newProj).catch(console.warn);
+    runSync(api.createProject(newProj)).catch(console.warn);
   };
   const onDeleteProject = (id) => {
     setProjects(p => p.filter(pr => pr.id !== id));
@@ -222,32 +255,53 @@ export default function IdeaOS() {
       setActiveProj(projects[0]?.id || '');
       setView('capture');
     }
-    api.deleteProject(id).catch(console.warn);
+    runSync(api.deleteProject(id)).catch(console.warn);
   };
   const onRenameProject = (id, name) => {
     setProjects(p => p.map(pr => pr.id === id ? { ...pr, name } : pr));
-    api.updateProject(id, { name }).catch(console.warn);
+    runSync(api.updateProject(id, { name })).catch(console.warn);
   };
 
   // ── Task actions ──
   const onAddTask = (task) => {
     setTasks(p => [...p, task]);
-    api.createTask(task).catch(console.warn);
+    runSync(api.createTask(task)).catch(console.warn);
   };
-  const onToggleTask = (id) => {
-    let newDone = false;
-    setTasks(p => p.map(t => { if (t.id === id) { newDone = !t.done; return { ...t, done: newDone }; } return t; }));
-    setTimeout(() => api.toggleTask(id, newDone).catch(console.warn), 0);
+  const onUpdateTask = (id, fields) => {
+    let completedAll = false;
+    setTasks(p => {
+      const updated = p.map(t => {
+        if (t.id === id) {
+          return { ...t, ...fields };
+        }
+        return t;
+      });
+      if (fields.done !== undefined) {
+        const activeCount = updated.filter(t => !t.done).length;
+        const targetTask = p.find(t => t.id === id);
+        if (fields.done && activeCount === 0 && updated.length > 0 && targetTask && !targetTask.done) {
+          completedAll = true;
+        }
+      }
+      return updated;
+    });
+    if (completedAll) {
+      import("./utils/confetti").then(({ triggerConfetti }) => triggerConfetti());
+    }
+    runSync(api.updateTask(id, fields)).catch(console.warn);
   };
   const onDeleteTask = (id) => {
     setTasks(p => p.filter(t => t.id !== id));
-    api.deleteTask(id).catch(console.warn);
+    runSync(api.deleteTask(id)).catch(console.warn);
   };
   const onReorderTasks = (fromIdx, toIdx) => {
     setTasks(prev => {
       const updated = [...prev];
       const [moved] = updated.splice(fromIdx, 1);
       updated.splice(toIdx, 0, moved);
+      setTimeout(() => {
+        runSync(api.reorderTasks(updated.map(t => t.id))).catch(console.warn);
+      }, 0);
       return updated;
     });
   };
@@ -255,15 +309,15 @@ export default function IdeaOS() {
   // ── Reminder actions ──
   const onAddReminder = (rem) => {
     setReminders(p => [...p, rem]);
-    api.createReminder(rem).catch(console.warn);
+    runSync(api.createReminder(rem)).catch(console.warn);
   };
-  const onMarkReminderDone = (id) => {
-    setReminders(p => p.map(r => r.id === id ? { ...r, done: true } : r));
-    api.updateReminder(id, { done: true }).catch(console.warn);
+  const onUpdateReminder = (id, fields) => {
+    setReminders(p => p.map(r => r.id === id ? { ...r, ...fields } : r));
+    runSync(api.updateReminder(id, fields)).catch(console.warn);
   };
   const onDeleteReminder = (id) => {
     setReminders(p => p.filter(r => r.id !== id));
-    api.deleteReminder(id).catch(console.warn);
+    runSync(api.deleteReminder(id)).catch(console.warn);
   };
 
   // ── Command palette navigation ──
@@ -290,6 +344,10 @@ export default function IdeaOS() {
         tasks={tasks}
         reminders={reminders}
         onNavigate={onPaletteNavigate}
+        onAddTask={onAddTask}
+        onAddIdea={onAddIdea}
+        onAddReminder={onAddReminder}
+        activeProjId={activeProj}
       />
 
       {/* Sidebar */}
@@ -306,6 +364,8 @@ export default function IdeaOS() {
         onRenameProject={onRenameProject}
         theme={theme} toggleTheme={toggleTheme}
         onOpenPalette={() => setShowPalette(true)}
+        syncStatus={syncStatus}
+        onMoveCardToProject={onMoveCardToProject}
       />
 
       {/* Main */}
@@ -319,16 +379,32 @@ export default function IdeaOS() {
         )}
 
         {view === 'board' && (
-          <ProjectBoard proj={proj} onAddIdea={onAddIdea} onDeleteIdea={onDeleteIdea} onTogglePin={onTogglePin} />
+          <ProjectBoard 
+            proj={proj} 
+            onAddIdea={onAddIdea} 
+            onDeleteIdea={onDeleteIdea} 
+            onTogglePin={onTogglePin}
+            onUpdateIdea={onUpdateIdea}
+          />
         )}
 
         {view === 'tasks' && (
-          <DailyTasks tasks={tasks} onAddTask={onAddTask} onToggleTask={onToggleTask} onDeleteTask={onDeleteTask} onReorderTasks={onReorderTasks} />
+          <DailyTasks 
+            tasks={tasks} 
+            onAddTask={onAddTask} 
+            onUpdateTask={onUpdateTask} 
+            onDeleteTask={onDeleteTask} 
+            onReorderTasks={onReorderTasks} 
+          />
         )}
 
         {view === 'reminders' && (
-          <Reminders reminders={reminders} projects={projects}
-            onAddReminder={onAddReminder} onMarkDone={onMarkReminderDone} onDeleteReminder={onDeleteReminder}
+          <Reminders 
+            reminders={reminders} 
+            projects={projects}
+            onAddReminder={onAddReminder} 
+            onUpdateReminder={onUpdateReminder} 
+            onDeleteReminder={onDeleteReminder}
           />
         )}
       </div>
