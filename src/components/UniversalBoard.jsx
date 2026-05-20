@@ -168,6 +168,11 @@ export function UniversalBoard({ boardCards, projects, onCapture, onUpdateCard, 
 
               return (
                 <div key={card.id}
+                  draggable
+                  onDragStart={e => {
+                    e.dataTransfer.setData("application/json", JSON.stringify({ cardId: card.id }));
+                    e.dataTransfer.effectAllowed = "move";
+                  }}
                   onMouseEnter={() => setHoveredCard(card.id)}
                   onMouseLeave={() => setHoveredCard(null)}
                   style={{
@@ -179,6 +184,7 @@ export function UniversalBoard({ boardCards, projects, onCapture, onUpdateCard, 
                     padding: '11px 13px', position: 'relative',
                     boxShadow: isHovered ? 'var(--shadow-card)' : 'none',
                     transition: 'background 0.15s ease, box-shadow 0.15s ease',
+                    cursor: 'grab',
                   }}>
                   {/* Main text — double-click to edit */}
                   {isEditingText ? (
